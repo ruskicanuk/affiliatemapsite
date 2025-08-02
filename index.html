@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flight Path Visualizer - Explore Global Routes</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
+
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="lib/leaflet.css" />
+    
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1 class="title">✈️ Flight Path Visualizer</h1>
+            <p class="subtitle">Discover beautiful flight routes around the world</p>
+        </header>
+
+        <!-- Controls -->
+        <div class="controls">
+            <div class="control-group">
+                <label for="origin-select" class="control-label">
+                    <span class="icon">🛫</span>
+                    Origin City
+                </label>
+                <select id="origin-select" class="control-select">
+                    <option value="">Select origin city...</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="destination-select" class="control-label">
+                    <span class="icon">🛬</span>
+                    Destination City
+                </label>
+                <select id="destination-select" class="control-select" disabled>
+                    <option value="">Select destination city...</option>
+                </select>
+            </div>
+
+            <button id="clear-route" class="clear-btn" disabled>
+                <span class="icon">🗑️</span>
+                Clear Route
+            </button>
+        </div>
+
+        <!-- Map Container -->
+        <div class="map-container">
+            <div id="map" class="map"></div>
+            <div class="map-overlay">
+                <div class="loading" id="loading">
+                    <div class="loading-spinner"></div>
+                    <p>Loading flight data...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Flight Details -->
+        <div class="flight-details" id="flight-details" style="display: none;">
+            <h3 class="details-title">Flight Information</h3>
+            <div class="details-content">
+                <div class="route-info">
+                    <div class="route-segment">
+                        <span class="route-label">From:</span>
+                        <span class="route-value" id="route-origin">-</span>
+                    </div>
+                    <div class="route-segment">
+                        <span class="route-label">To:</span>
+                        <span class="route-value" id="route-destination">-</span>
+                    </div>
+                    <div class="route-segment">
+                        <span class="route-label">Duration:</span>
+                        <span class="route-value" id="route-duration">-</span>
+                    </div>
+                    <div class="route-segment">
+                        <span class="route-label">Airlines:</span>
+                        <span class="route-value" id="route-airlines">-</span>
+                    </div>
+                </div>
+                <div class="transfer-info" id="transfer-info" style="display: none;">
+                    <h4 class="transfer-title">Via Transfer</h4>
+                    <div class="route-segment">
+                        <span class="route-label">Transfer City:</span>
+                        <span class="route-value" id="transfer-city">-</span>
+                    </div>
+                    <div class="route-segment">
+                        <span class="route-label">Total Duration:</span>
+                        <span class="route-value" id="total-duration">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Powered by Leaflet.js • Map data from Natural Earth</p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="lib/leaflet.js"></script>
+    <script src="lib/leaflet.curve.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
