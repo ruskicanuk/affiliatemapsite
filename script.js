@@ -11,6 +11,7 @@ class FlightPathVisualizer {
         this.drMarkers = [];
         this.currentShuttleLine = null;
         this.worldLayer = null;
+        this.LABEL_SEPARATION_PIXELS = 35; // Configurable label separation distance
         this.selectedOrigin = null;
         this.selectedRoute = null;
 
@@ -137,15 +138,12 @@ class FlightPathVisualizer {
         const newImageSrc = this.destinationImages[destinationName];
 
         if (newImageSrc && imageElement.src !== newImageSrc) {
-            // Add fade out effect
-            imageElement.classList.add('fade-out');
-
-            // Change image after fade out completes
+            // Fade out is handled by addMapFadeEffect() for synchronization
+            // Change image immediately since fade out is instant
             setTimeout(() => {
                 imageElement.src = newImageSrc;
                 imageElement.alt = `View from ${destinationName}`;
-                imageElement.classList.remove('fade-out');
-            }, 250); // Half of the transition duration
+            }, 0); // Change image immediately
         }
     }
 
@@ -355,6 +353,11 @@ class FlightPathVisualizer {
         const flightOptionsDiv = document.getElementById('flight-options');
         flightOptionsDiv.style.display = 'block';
 
+        // Update the options title with city name only (remove country)
+        const optionsTitle = document.getElementById('options-title');
+        const originCityOnly = selectedOrigin.split(',')[0].trim(); // Extract city name only
+        optionsTitle.innerHTML = `${originCityOnly} ${this.createDurationArrow('varies')} <img src="assets/logo-final-2023-05-20.svg" class="inline-logo" alt="Green Office">`;
+
         // Clear all destination columns
         this.destinations.forEach(dest => {
             const columnId = this.getColumnId(dest.name);
@@ -391,89 +394,198 @@ class FlightPathVisualizer {
 
         if (!destData) return routes;
 
-        // Step 1: Find candidate connection cities using bidirectional lookup
-        const candidateCities = new Set();
 
-        // Add cities from origin's direct routes
-        this.flightData.forEach(destData => {
-            destData.direct_services.forEach(service => {
-                const serviceOriginKey = `${service.origin_city_name}, ${service.origin_country}`;
-                if (serviceOriginKey === originKey) {
-                    candidateCities.add(`${destData.destination_city_name}, ${destData.destination_country}`);
-                }
-            });
-        });
 
-        // Add cities that have direct routes to target destination
-        destData.direct_services.forEach(service => {
-            candidateCities.add(`${service.origin_city_name}, ${service.origin_country}`);
-        });
+        // Step 1: Get ServicesStartingAirport1 - airports that Starting Airport serves directly
+        const servicesStartingAirport1 = this.getDirectServicesFromAirport(originKey);
 
-        // Step 2: Add direct flight if exists (bidirectional check)
-        const directFlight = this.findBidirectionalFlight(originKey, `${destination.name}, ${destination.country}`);
+        // Step 2: Get ServicesStartingAirport2 - airports that have Starting Airport as a service
+        const servicesStartingAirport2 = this.getAirportsServingOrigin(originKey);
+
+        // Step 3: Combine into ServicesStartingAirportCombined
+        const servicesStartingAirportCombined = this.combineAirportSets(servicesStartingAirport1, servicesStartingAirport2);
+
+        // Step 4-6: Get ServicesEndingAirportCombined for this destination
+        const servicesEndingAirport1 = this.getDirectServicesFromAirport(`${destination.name}, ${destination.country}`);
+        const servicesEndingAirport2 = this.getAirportsServingOrigin(`${destination.name}, ${destination.country}`);
+        const servicesEndingAirportCombined = this.combineAirportSets(servicesEndingAirport1, servicesEndingAirport2);
+
+        // Check for direct flight first (always at top if available)
+        const directFlight = this.findDirectFlight(originKey, `${destination.name}, ${destination.country}`);
         if (directFlight) {
             routes.push({
                 type: 'direct',
                 duration: directFlight.flight_duration_minutes,
                 segments: [directFlight],
-                destination: destData
+                destination: destData,
+                transferAirport: null
             });
         }
 
-        // Step 3: Find connecting routes through candidate cities (bidirectional)
-        candidateCities.forEach(candidateCity => {
-            // Skip if this is our origin or final destination
-            if (candidateCity === originKey ||
-                candidateCity === `${destination.name}, ${destination.country}`) return;
+        // Find intersection - these are the transfer airports
+        const transferAirports = this.findIntersection(servicesStartingAirportCombined, servicesEndingAirportCombined);
 
-            // Find first leg: origin to via city (bidirectional)
-            const firstLeg = this.findBidirectionalFlight(originKey, candidateCity);
-            if (!firstLeg) return;
+        // Debug logging
+        if (originKey === "Calgary, Canada" && destination.name === "Santiago") {
+            console.log(`DEBUG: Calgary -> Santiago`);
+            console.log(`ServicesStartingAirportCombined:`, Array.from(servicesStartingAirportCombined));
+            console.log(`ServicesEndingAirportCombined:`, Array.from(servicesEndingAirportCombined));
+            console.log(`Transfer airports found:`, Array.from(transferAirports));
+        }
 
-            // Find second leg: via city to final destination (bidirectional)
-            const secondLeg = this.findBidirectionalFlight(candidateCity, `${destination.name}, ${destination.country}`);
-            if (!secondLeg) return;
+        // Create connecting routes for each transfer airport
+        transferAirports.forEach(transferAirportKey => {
+            // Skip if transfer airport is the same as origin or destination
+            if (transferAirportKey === originKey || transferAirportKey === `${destination.name}, ${destination.country}`) {
+                return;
+            }
 
-            const viaCity = candidateCity.split(', ')[0]; // Extract city name
-            const totalDuration = firstLeg.flight_duration_minutes + secondLeg.flight_duration_minutes;
+            // Get flight details for both legs
+            const firstLegDetails = this.getFlightDetails(originKey, transferAirportKey);
+            const secondLegDetails = this.getFlightDetails(transferAirportKey, `${destination.name}, ${destination.country}`);
 
-            // Only add if we don't already have this exact route
-            const existingRoute = routes.find(r =>
-                r.type === 'connecting' &&
-                r.via === viaCity &&
-                r.duration === totalDuration
-            );
+            if (firstLegDetails && secondLegDetails) {
+                const transferCity = transferAirportKey.split(', ')[0]; // Extract city name
+                const totalDuration = firstLegDetails.flight_duration_minutes + secondLegDetails.flight_duration_minutes;
 
-            if (!existingRoute) {
                 routes.push({
                     type: 'connecting',
                     duration: totalDuration,
-                    segments: [firstLeg, secondLeg],
+                    segments: [firstLegDetails, secondLegDetails],
                     destination: destData,
-                    via: viaCity
+                    via: transferCity,
+                    transferAirport: transferAirportKey
                 });
             }
         });
 
-        // Calculate efficiency ratio for each route and sort by it
+        // Calculate efficiency ratio for each route and sort
         routes.forEach(route => {
             const volume = this.calculateRouteVolume(route);
-            route.volumeFactor = Math.max(volume, 0.1); // Minimum volume factor to avoid division by zero
+            route.volumeFactor = Math.max(volume, 0.1);
             route.efficiencyRatio = route.duration / route.volumeFactor;
         });
 
-        // Separate direct and connecting flights
-        const directFlights = routes.filter(route => route.type === 'direct');
-        const connectingFlights = routes.filter(route => route.type === 'connecting');
+        // Sort routes: direct flights first, then connecting flights by efficiency
+        const directFlights = routes.filter(r => r.type === 'direct');
+        const connectingFlights = routes.filter(r => r.type === 'connecting')
+            .sort((a, b) => a.efficiencyRatio - b.efficiencyRatio);
 
-        // Sort each group by efficiency ratio
-        directFlights.sort((a, b) => a.efficiencyRatio - b.efficiencyRatio);
-        connectingFlights.sort((a, b) => a.efficiencyRatio - b.efficiencyRatio);
-
-        // Combine with direct flights first, then connecting flights
         const sortedRoutes = [...directFlights, ...connectingFlights];
 
         return sortedRoutes.slice(0, 30);
+    }
+
+    // Helper function: Get airports that a given airport serves directly (ServicesX1)
+    getDirectServicesFromAirport(airportKey) {
+        const services = new Set();
+
+        // Find the airport as a destination in flight data
+        const destRecord = this.flightData.find(d => {
+            const destKey = `${d.destination_city_name}, ${d.destination_country}`;
+            return destKey === airportKey;
+        });
+
+        if (destRecord) {
+            // Add all airports that serve this destination
+            destRecord.direct_services.forEach(service => {
+                const serviceKey = `${service.origin_city_name}, ${service.origin_country}`;
+                services.add(serviceKey);
+            });
+        }
+
+        return services;
+    }
+
+    // Helper function: Get airports that have the given airport as a service (ServicesX2)
+    getAirportsServingOrigin(originKey) {
+        const services = new Set();
+
+        // Look through all destinations to find ones that have this origin as a service
+        this.flightData.forEach(destRecord => {
+            const hasService = destRecord.direct_services.some(service => {
+                const serviceKey = `${service.origin_city_name}, ${service.origin_country}`;
+                return serviceKey === originKey;
+            });
+
+            if (hasService) {
+                const destKey = `${destRecord.destination_city_name}, ${destRecord.destination_country}`;
+                services.add(destKey);
+            }
+        });
+
+        return services;
+    }
+
+    // Helper function: Combine two sets of airports (union operation)
+    combineAirportSets(set1, set2) {
+        const combined = new Set();
+        set1.forEach(airport => combined.add(airport));
+        set2.forEach(airport => combined.add(airport));
+        return combined;
+    }
+
+    // Helper function: Find intersection of two sets
+    findIntersection(set1, set2) {
+        const intersection = new Set();
+        set1.forEach(airport => {
+            if (set2.has(airport)) {
+                intersection.add(airport);
+            }
+        });
+        return intersection;
+    }
+
+    // Helper function: Find direct flight between two airports
+    findDirectFlight(originKey, destinationKey) {
+        const [destCity, destCountry] = destinationKey.split(', ');
+
+        // Find destination data
+        const destData = this.flightData.find(d =>
+            d.destination_city_name === destCity &&
+            d.destination_country === destCountry
+        );
+
+        if (!destData) return null;
+
+        // Look for direct service from origin to destination
+        const directService = destData.direct_services.find(service => {
+            const serviceOriginKey = `${service.origin_city_name}, ${service.origin_country}`;
+            return serviceOriginKey === originKey;
+        });
+
+        return directService || null;
+    }
+
+    // Helper function: Get flight details for a specific route leg
+    getFlightDetails(originKey, destinationKey) {
+        // First try to find direct flight from origin to destination
+        const directFlight = this.findDirectFlight(originKey, destinationKey);
+        if (directFlight) {
+            return directFlight;
+        }
+
+        // If not found, try reverse lookup (destination to origin, then reverse the data)
+        const reverseFlight = this.findDirectFlight(destinationKey, originKey);
+        if (reverseFlight) {
+            // Create a reversed flight record to match the requested direction
+            const [originCity, originCountry] = originKey.split(', ');
+
+            // Find the destination record to get proper airport coordinates
+            const originDestRecord = this.flightData.find(d =>
+                d.destination_city_name === originCity && d.destination_country === originCountry
+            );
+
+            return {
+                ...reverseFlight,
+                origin_city_name: originCity,
+                origin_country: originCountry,
+                origin_airport_iata: originDestRecord ? originDestRecord.destination_airport_iata : reverseFlight.origin_airport_iata,
+                origin_airport_coordinates: originDestRecord ? originDestRecord.destination_airport_coordinates : reverseFlight.origin_airport_coordinates
+            };
+        }
+
+        return null;
     }
 
     findBidirectionalFlight(originKey, destinationKey) {
@@ -522,7 +634,18 @@ class FlightPathVisualizer {
             };
         }
 
-        return forwardFlight || reverseFlight;
+        // If we only have a reverse flight, we need to swap origin/destination to match the requested direction
+        if (reverseFlight && !forwardFlight) {
+            return {
+                ...reverseFlight,
+                origin_city_name: originCity,
+                origin_country: originCountry,
+                origin_airport_iata: originData ? originData.destination_airport_iata : reverseFlight.origin_airport_iata,
+                origin_airport_coordinates: originData ? originData.destination_airport_coordinates : reverseFlight.origin_airport_coordinates
+            };
+        }
+
+        return forwardFlight;
     }
 
     combineAirlineData(airlines1, airlines2) {
@@ -625,7 +748,7 @@ class FlightPathVisualizer {
         const column = document.getElementById(columnId);
         if (!column) return;
 
-        routes.forEach((route, index) => {
+        routes.forEach((route) => {
             const button = document.createElement('button');
             button.className = 'flight-option-btn';
 
@@ -686,6 +809,9 @@ class FlightPathVisualizer {
             buttonElement.classList.add('selected');
         }
 
+        // Update flight options header with selected route details
+        this.updateFlightOptionsHeader(route);
+
         // Add fade effect to maps
         this.addMapFadeEffect();
 
@@ -699,17 +825,28 @@ class FlightPathVisualizer {
         this.displayFlightDetails(route);
     }
 
+    updateFlightOptionsHeader(route) {
+        const optionsTitle = document.getElementById('options-title');
+        const originCity = route.segments[0].origin_city_name; // Extract city name only
+        const destCity = route.destination.destination_city_name;
+        const shuttleTime = this.greenOfficeLocation.shuttleTimes[destCity];
+        const totalDurationWithShuttle = route.duration + shuttleTime;
+        const totalDuration = this.formatDuration(totalDurationWithShuttle);
+
+        optionsTitle.innerHTML = `${originCity} ${this.createDurationArrow(totalDuration)} <img src="assets/logo-final-2023-05-20.svg" class="inline-logo" alt="Green Office">&nbsp; <span class="via-text">via</span> ${destCity}`;
+    }
+
     addMapFadeEffect() {
         const worldMap = document.getElementById('world-map');
         const destinationImage = document.getElementById('destination-image');
 
-        // Add fade-out class
+        // Add fade-out class (instant)
         worldMap.classList.add('fade-out');
         if (destinationImage) {
             destinationImage.classList.add('fade-out');
         }
 
-        // Remove fade-out class after 0.5 seconds
+        // Remove fade-out class after 0.5 seconds for gradual fade in
         setTimeout(() => {
             worldMap.classList.remove('fade-out');
             if (destinationImage) {
@@ -722,19 +859,24 @@ class FlightPathVisualizer {
         this.clearRoute();
 
         const segments = route.segments;
+        const markerInfos = [];
 
-        // Add markers for all points on world map
+        // Collect all marker information first
         segments.forEach((segment, index) => {
             const originCoords = this.parseCoordinates(segment.origin_airport_coordinates);
             const icon = index === 0 ? '🛫' : '🔄';
             const type = index === 0 ? 'origin' : 'transfer';
-            this.addMarker(originCoords, segment.origin_city_name, icon, type);
+            const markerInfo = this.addMarker(originCoords, segment.origin_city_name, icon, type);
+            markerInfos.push(markerInfo);
         });
 
-        // Add final destination marker on world map
-        const lastSegment = segments[segments.length - 1];
+        // Add final destination marker info
         const destCoords = this.parseCoordinates(route.destination.destination_airport_coordinates);
-        this.addMarker(destCoords, route.destination.destination_city_name, '🛬', 'destination');
+        const destMarkerInfo = this.addMarker(destCoords, route.destination.destination_city_name, '🛬', 'destination');
+        markerInfos.push(destMarkerInfo);
+
+        // Create labels with collision detection
+        this.createLabelsWithCollisionDetection(markerInfos);
 
         // Draw paths between all segments on world map
         for (let i = 0; i < segments.length; i++) {
@@ -753,8 +895,7 @@ class FlightPathVisualizer {
             this.drawDirectPath(originCoords, destCoords);
         }
 
-        // Draw line from destination airport to Green Office on world map
-        this.drawAirportToOfficeConnection(destCoords);
+        // Airport to office connection removed per user request
 
         // Fit world map to show route with optimized zoom
         this.optimizeWorldMapZoom();
@@ -768,57 +909,205 @@ class FlightPathVisualizer {
     }
 
     addMarker(coords, cityName, icon, type) {
-        // Check for collision with existing markers
-        const adjustedCoords = this.adjustMarkerPosition(coords, cityName);
-
-        const marker = L.marker(adjustedCoords, {
+        // Add dot marker first with lower z-index to ensure it appears under labels
+        const dotMarker = L.marker(coords, {
             icon: L.divIcon({
-                html: `<div class="custom-marker ${type}">
-                    <span class="marker-label">${cityName}</span>
-                    <span class="marker-icon">${icon}</span>
-                </div>`,
+                html: `<div class="city-dot ${type}"></div>`,
                 className: 'custom-div-icon',
-                iconSize: [120, 40],
-                iconAnchor: [60, 40]
-            })
+                iconSize: [12, 12],
+                iconAnchor: [6, 6]
+            }),
+            zIndexOffset: -1000 // Ensure dots appear below labels
         }).addTo(this.worldMap);
 
-        this.currentMarkers.push(marker);
-        return marker;
+        // Store marker info for collision detection
+        const markerInfo = {
+            coords: coords,
+            type: type,
+            cityName: cityName,
+            icon: icon,
+            dotMarker: dotMarker
+        };
+
+        this.currentMarkers.push(dotMarker);
+        return markerInfo; // Return info instead of marker for batch processing
     }
 
-    adjustMarkerPosition(coords, cityName) {
-        const [lat, lng] = coords;
-        const minDistance = 2.0; // Minimum distance in degrees to avoid collision
 
-        // Check collision with existing markers
-        for (const existingMarker of this.currentMarkers) {
-            const existingPos = existingMarker.getLatLng();
-            const distance = this.calculateDistance([lat, lng], [existingPos.lat, existingPos.lng]);
+    createLabelsWithCollisionDetection(markerInfos) {
+        const TARGET_SEPARATION = this.LABEL_SEPARATION_PIXELS; // Configurable separation distance in pixels
 
-            if (distance < 300) { // If markers are within 300km (increased for better separation)
-                // Calculate smart offset based on relative position
-                const deltaLat = lat - existingPos.lat;
-                const deltaLng = lng - existingPos.lng;
 
-                // Normalize the direction vector
-                const magnitude = Math.sqrt(deltaLat * deltaLat + deltaLng * deltaLng);
-                const normalizedLat = magnitude > 0 ? deltaLat / magnitude : 0;
-                const normalizedLng = magnitude > 0 ? deltaLng / magnitude : 1;
 
-                // Apply offset in the direction away from existing marker
-                const offsetDistance = minDistance + 1.0; // Extra buffer
-                const offsetLat = normalizedLat * offsetDistance;
-                const offsetLng = normalizedLng * offsetDistance;
+        // Convert coordinates to screen positions for collision detection
+        const screenPositions = markerInfos.map(info => {
+            const point = this.worldMap.latLngToContainerPoint(info.coords);
+            const result = {
+                ...info,
+                screenX: point.x,
+                screenY: point.y,
+                adjustedY: 20 // Default Y anchor
+            };
 
-                return [existingPos.lat + offsetLat, existingPos.lng + offsetLng];
+            return result;
+        });
+
+        // Get map bounds for constraint checking
+        const mapSize = this.worldMap.getSize();
+        const minY = 0;
+        const maxY = mapSize.y;
+        // Sort by screen Y position for processing
+        screenPositions.sort((a, b) => a.screenY - b.screenY);
+
+        // Adjust Y positions to avoid collisions
+
+        for (let i = 0; i < screenPositions.length; i++) {
+            const current = screenPositions[i];
+
+            // Skip collision detection for origin - never shift origin
+            if (current.type === 'origin') {
+                continue;
+            }
+
+            let hasCollision = false;
+            let collidingMarkers = [];
+
+            // Check collision with all previous markers
+            for (let j = 0; j < i; j++) {
+                const previous = screenPositions[j];
+                const yDiff = Math.abs(current.screenY - previous.screenY);
+
+
+
+                if (yDiff < TARGET_SEPARATION) {
+                    hasCollision = true;
+                    collidingMarkers.push(previous);
+
+                    if (this.DEBUG_COLLISION_DETECTION) {
+                        console.log(`   ⚠️ COLLISION with ${previous.type} (${previous.cityName})!`);
+                    }
+                }
+            }
+
+            if (hasCollision) {
+                // Calculate needed separation (use largest collision)
+                const maxCollision = Math.max(...collidingMarkers.map(m =>
+                    TARGET_SEPARATION - Math.abs(current.screenY - m.screenY)
+                ));
+
+                // Determine shift options
+                const shiftUp = current.adjustedY - maxCollision;
+                const shiftDown = current.adjustedY + maxCollision;
+
+                if (this.DEBUG_COLLISION_DETECTION) {
+                    console.log(`   📊 Max collision needs ${maxCollision.toFixed(1)}px separation`);
+                    console.log(`   📊 Shift options: UP=${shiftUp.toFixed(1)}, DOWN=${shiftDown.toFixed(1)}`);
+                }
+
+                // Check bounds
+                const upInBounds = (current.screenY + shiftUp) >= minY;
+                const downInBounds = (current.screenY + shiftDown) <= maxY;
+
+                if (this.DEBUG_COLLISION_DETECTION) {
+                    console.log(`   🚧 Bounds check: UP=${upInBounds}, DOWN=${downInBounds}`);
+                }
+
+                // Determine preferred direction based on marker type and colliding positions
+                let preferUp = false;
+
+                if (current.type === 'transfer') {
+                    // For transfer: prefer opposite direction from origin
+                    const originMarker = screenPositions.find(m => m.type === 'origin');
+                    if (originMarker) {
+                        preferUp = current.screenY > originMarker.screenY; // If transfer below origin, prefer up
+
+                        if (this.DEBUG_COLLISION_DETECTION) {
+                            console.log(`   🔄 Transfer logic: origin at ${originMarker.screenY.toFixed(1)}, transfer at ${current.screenY.toFixed(1)} → prefer ${preferUp ? 'UP' : 'DOWN'}`);
+                        }
+                    }
+                } else if (current.type === 'destination') {
+                    // For destination: consider all colliding markers
+                    const collidingYs = collidingMarkers.map(m => m.screenY);
+                    const offendingHighY = Math.min(...collidingYs);
+                    const offendingLowY = Math.max(...collidingYs);
+
+                    if (offendingHighY < current.screenY) {
+                        preferUp = true; // Colliding markers above, prefer up
+                    } else if (offendingLowY > current.screenY) {
+                        preferUp = false; // Colliding markers below, prefer down
+                    } else {
+                        preferUp = false; // Default to down
+                    }
+
+                    if (this.DEBUG_COLLISION_DETECTION) {
+                        console.log(`   🎯 Destination logic: offending range [${offendingHighY.toFixed(1)}, ${offendingLowY.toFixed(1)}], destination at ${current.screenY.toFixed(1)} → prefer ${preferUp ? 'UP' : 'DOWN'}`);
+                    }
+                }
+
+                // Apply preference with bounds override
+                const oldAdjustedY = current.adjustedY;
+
+                if (preferUp && upInBounds) {
+                    current.adjustedY = shiftUp;
+                    if (this.DEBUG_COLLISION_DETECTION) {
+                        console.log(`   ⬆️ Preferred UP direction applied: ${current.adjustedY.toFixed(1)} (was ${oldAdjustedY})`);
+                    }
+                } else if (!preferUp && downInBounds) {
+                    current.adjustedY = shiftDown;
+                    if (this.DEBUG_COLLISION_DETECTION) {
+                        console.log(`   ⬇️ Preferred DOWN direction applied: ${current.adjustedY.toFixed(1)} (was ${oldAdjustedY})`);
+                    }
+                } else if (upInBounds) {
+                    current.adjustedY = shiftUp;
+                    if (this.DEBUG_COLLISION_DETECTION) {
+                        console.log(`   ⬆️ Bounds override - only UP valid: ${current.adjustedY.toFixed(1)} (was ${oldAdjustedY})`);
+                    }
+                } else if (downInBounds) {
+                    current.adjustedY = shiftDown;
+                    if (this.DEBUG_COLLISION_DETECTION) {
+                        console.log(`   ⬇️ Bounds override - only DOWN valid: ${current.adjustedY.toFixed(1)} (was ${oldAdjustedY})`);
+                    }
+                } else {
+                    if (this.DEBUG_COLLISION_DETECTION) {
+                        console.log(`   🚫 No valid direction, keeping default position ${current.adjustedY}`);
+                    }
+                }
+            } else if (this.DEBUG_COLLISION_DETECTION) {
+                console.log(`   ✅ No collisions detected, keeping default Y anchor: ${current.adjustedY}`);
             }
         }
 
-        return coords; // No collision, return original coordinates
+        // Create label markers with adjusted positions
+        if (this.DEBUG_COLLISION_DETECTION) {
+            console.log('\n🏗️ === LABEL CREATION PHASE ===');
+        }
+
+        screenPositions.forEach((info, index) => {
+            if (this.DEBUG_COLLISION_DETECTION) {
+                console.log(`🏷️ Creating label ${index + 1}/${screenPositions.length}: ${info.type} (${info.cityName})`);
+                console.log(`   📍 Position: [${info.coords[0].toFixed(2)}, ${info.coords[1].toFixed(2)}]`);
+                console.log(`   📺 Screen: [${info.screenX.toFixed(1)}, ${info.screenY.toFixed(1)}]`);
+                console.log(`   ⚓ Anchor: [-5, ${info.adjustedY}]`);
+            }
+
+            const labelMarker = L.marker(info.coords, {
+                icon: L.divIcon({
+                    html: `<div class="custom-marker ${info.type}">
+                        <span class="marker-label">${info.cityName}</span>
+                        <span class="marker-icon">${info.icon}</span>
+                    </div>`,
+                    className: 'custom-div-icon',
+                    iconSize: [120, 40],
+                    iconAnchor: [-5, info.adjustedY]
+                }),
+                zIndexOffset: 1000 // Ensure labels appear above dots
+            }).addTo(this.worldMap);
+
+            this.currentMarkers.push(labelMarker);
+        });
+
+
     }
-
-
 
     optimizeWorldMapZoom() {
         if (this.currentMarkers.length === 0) return;
@@ -854,11 +1143,11 @@ class FlightPathVisualizer {
     }
 
     drawDirectPath(start, end) {
-        // Draw more direct, nearly straight lines as requested
+        // Draw straight lines with black color
         const path = L.polyline([start, end], {
-            color: '#22c55e',  // Green color to match branding
-            weight: 4,
-            opacity: 0.8
+            color: '#000000',  // Black color
+            weight: 3,
+            opacity: 0.7
         }).addTo(this.worldMap);
 
         if (!this.currentPath) {
@@ -867,20 +1156,7 @@ class FlightPathVisualizer {
         this.currentPath.push(path);
     }
 
-    drawAirportToOfficeConnection(airportCoords) {
-        // Draw line from airport to Green Office on world map
-        const officeLine = L.polyline([airportCoords, this.greenOfficeLocation.coords], {
-            color: '#109a48',  // Same green color as other paths
-            weight: 3,
-            opacity: 0.8,
-            dashArray: '8, 4' // Dashed line to distinguish from flight paths
-        }).addTo(this.worldMap);
 
-        if (!this.currentPath) {
-            this.currentPath = [];
-        }
-        this.currentPath.push(officeLine);
-    }
 
     generateCurvePoints(start, control, end, numPoints) {
         const points = [];
@@ -906,15 +1182,7 @@ class FlightPathVisualizer {
 
     displayFlightDetails(route) {
         const detailsDiv = document.getElementById('flight-details');
-        const titleElement = document.getElementById('details-title');
-
-        // Set overall header with total duration including shuttle
-        const originCity = route.segments[0].origin_city_name;
         const destCity = route.destination.destination_city_name;
-        const shuttleTime = this.greenOfficeLocation.shuttleTimes[destCity];
-        const totalDurationWithShuttle = route.duration + shuttleTime;
-        const totalDuration = this.formatDuration(totalDurationWithShuttle);
-        titleElement.innerHTML = `${originCity} ${this.createDurationArrow(totalDuration)} <img src="assets/logo-final-2023-05-20.svg" class="inline-logo" alt="Green Office">`;
 
         // Show first segment
         const firstSegment = document.getElementById('first-segment');
@@ -1027,9 +1295,6 @@ class FlightPathVisualizer {
     }
 
     getServiceMonths(startMonth, endMonth) {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
         if (startMonth === 'Jan' && endMonth === 'Dec') {
             return 'Year-round';
         }
@@ -1126,50 +1391,7 @@ class FlightPathVisualizer {
     }
 }
 
-// Add custom marker styles
-const style = document.createElement('style');
-style.textContent = `
-    .custom-div-icon {
-        background: none !important;
-        border: none !important;
-    }
-    
-    .custom-marker {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        text-align: center;
-    }
-    
-    .marker-icon {
-        font-size: 24px;
-        margin-bottom: 4px;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-    }
-    
-    .marker-label {
-        background: rgba(255,255,255,0.95);
-        padding: 4px 8px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 600;
-        color: #333;
-        white-space: nowrap;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-        border: 1px solid rgba(0,0,0,0.1);
-    }
-    
-    .custom-marker.origin .marker-label {
-        background: linear-gradient(135deg, #10b981, #059669);
-        color: white;
-    }
-    
-    .custom-marker.destination .marker-label {
-        background: linear-gradient(135deg, #3b82f6, #1d4ed8);
-        color: white;
-    }
-`;
-document.head.appendChild(style);
+// Marker styles are now handled in styles.css to prevent conflicts
 
 // Initialize the application when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {

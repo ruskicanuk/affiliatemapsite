@@ -181,28 +181,45 @@ body {
 .maps-container {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 15px; /* Reduced from 20px for more compact layout */
-    margin-bottom: 15px; /* Reduced from 20px */
+    gap: 10px; /* Further reduced for tighter layout */
+    margin-bottom: 15px;
     animation: slideInUp 0.5s ease-out 0.6s both;
 }
 
 .map-section {
     background: rgba(255,255,255,0.95);
     border-radius: 16px;
-    padding: 15px; /* Reduced from 20px */
+    padding: 15px;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255,255,255,0.3);
 }
 
-.map-container {
+.map-container, .image-container {
     position: relative;
     overflow: hidden;
     border-radius: 12px;
     box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.1);
-    /* Fuzzy border effect */
-    border: 1px solid rgba(0,0,0,0.1);
-    background: linear-gradient(45deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4));
-    padding: 2px;
+    border: 4px solid black;
+    padding: 0;
+    flex: 1;
+    height: 380px; /* Fixed height for perfect alignment */
+}
+
+.map-container {
+    background: rgb(137, 216, 236); /* Ocean color for world map */
+}
+
+.map-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: 8px; /* Slightly smaller than container */
+    box-shadow: inset 0 0 20px rgba(137, 216, 236, 0.8); /* Inner glow to blend edges */
+    pointer-events: none;
+    z-index: 10;
 }
 
 .map-container::before {
@@ -220,31 +237,29 @@ body {
 
 .map {
     width: 100%;
-    height: 380px; /* Reduced from 400px for more compact layout */
+    height: 100%; /* Fill container completely */
     transition: opacity 0.5s ease-in-out;
 }
 
 .map.fade-out {
     opacity: 0.3;
+    transition: opacity 0s; /* Instant fade out */
 }
 
 /* Destination Image Styles */
-.image-container {
-    position: relative;
-    overflow: hidden;
-    border-radius: 12px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.1);
-}
 
 .destination-image {
     width: 100%;
-    height: 380px;
+    height: 100%; /* Fill container completely */
     object-fit: cover;
+    object-position: center top; /* Crop from bottom by positioning to top */
     transition: opacity 0.5s ease-in-out;
+    transform: scale(1.05); /* Scale up slightly to crop bottom 5% */
 }
 
 .destination-image.fade-out {
     opacity: 0;
+    transition: opacity 0s; /* Instant fade out */
 }
 
 .map-overlay {
@@ -382,6 +397,10 @@ body {
     border-color: var(--primary-green);
 }
 
+.flight-option-btn.selected .volume-fill {
+    background: white;
+}
+
 .button-content {
     display: flex;
     flex-direction: column;
@@ -406,11 +425,11 @@ body {
 }
 
 .volume-section {
-    flex: 0 0 80%; /* Takes 80% of the row */
+    flex: 0 0 70%; /* Takes 70% of the row (reduced from 80%) */
 }
 
 .duration-section {
-    flex: 0 0 20%; /* Takes 20% of the row */
+    flex: 0 0 30%; /* Takes 30% of the row (increased from 20%) */
     display: flex;
     justify-content: flex-end;
     align-items: center;
@@ -445,7 +464,7 @@ body {
 }
 
 .flight-option-btn:hover .volume-indicator::after {
-    content: "Flight Volume";
+    content: "Daily Flight Volume";
     position: absolute;
     top: 50%;
     left: 50%;
@@ -470,6 +489,7 @@ body {
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255,255,255,0.3);
     animation: slideInUp 0.5s ease-out;
+    border-top: 3px solid rgba(16, 154, 72, 0.4); /* Light green separator line */
 }
 
 .details-title {
@@ -510,6 +530,20 @@ body {
 .inline-logo {
     height: 20px;
     vertical-align: middle;
+}
+
+/* Flight Options Title Logo - 20% larger than travel details header */
+.options-title .inline-logo {
+    height: 48px; /* 20% increase from 40px */
+}
+
+/* Flight Options Title "via" text styling */
+.options-title {
+    color: #109a48; /* Default green color for main text */
+}
+
+.options-title .via-text {
+    color: black; /* Black color for "via" text */
 }
 
 /* Travel Details Header Logo - 100% increase */
@@ -801,7 +835,7 @@ body {
     color: black;
     white-space: nowrap;
     order: 1; /* Text appears above arrow */
-    margin-bottom: 1px; /* Reduced from 2px to bring arrow closer */
+    margin-bottom: -2px; /* Negative margin to bring arrow much closer */
 }
 
 /* World Map Markers */
@@ -813,7 +847,7 @@ body {
 .custom-marker {
     display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start; /* Left align the content */
     font-size: 0.85rem;
     font-weight: 600;
     transition: all 0.3s ease;
@@ -823,18 +857,18 @@ body {
 }
 
 .custom-marker.origin .marker-label {
-    background: rgba(59, 130, 246, 0.9); /* Blue background for origin text */
-    color: white;
-    border: 2px solid #1d4ed8;
+    background: rgba(230, 230, 255, 0.9); /* Blue background for origin text */
+    color: rgb(38, 0, 255);
+    border: 3px solid rgb(38, 0, 255);; /* Blue border */
     border-radius: 12px;
     padding: 4px 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .custom-marker.destination .marker-label {
-    background: rgba(16, 154, 72, 0.9); /* Green background for destination text */
-    color: white;
-    border: 2px solid #0f5132;
+    background: rgba(255, 255, 255, 0.9); /* Green background for destination text */
+    color: rgba(16, 154, 72, 0.9);
+    border: 3px solid rgba(16, 154, 72, 0.9); /* Green border */
     border-radius: 12px;
     padding: 4px 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -843,7 +877,7 @@ body {
 .custom-marker.transfer .marker-label {
     background: rgba(251, 191, 36, 0.9); /* Yellow background for transfer text */
     color: #92400e;
-    border: 2px solid #d97706;
+    border: 3px solid #92400e; /* Black border */
     border-radius: 12px;
     padding: 4px 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
@@ -851,7 +885,7 @@ body {
 
 .marker-icon {
     margin-left: 5px; /* Changed from margin-right to margin-left */
-    font-size: 1rem;
+    font-size: 2rem; /* Doubled from 1rem to 2rem */
     background: transparent;
     filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));
 }
@@ -860,9 +894,49 @@ body {
     white-space: nowrap;
 }
 
+/* City Dot Markers */
+.city-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    border: 2px solid #000000;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+.city-dot.origin {
+    background-color: rgb(38, 0, 255); /* Same blue as origin city label */
+}
+
+.city-dot.destination {
+    background-color: rgba(16, 154, 72, 0.9); /* Same green as destination border */
+}
+
+.city-dot.transfer {
+    background-color: #92400e; /* Same dark yellow/brown as transfer city label */
+}
+
 /* Custom Map Styles */
 .leaflet-container {
-    background: rgb(137, 216, 236); /* Updated ocean color to match DR images */
+    background: rgb(137, 216, 236) !important; /* Ocean color matching container */
+    border: none !important;
+    outline: none !important;
+    border-radius: 8px; /* Match container inner radius */
+    overflow: hidden; /* Ensure clean edges */
+}
+
+.map {
+    border: none !important;
+    outline: none !important;
+    border-radius: 8px;
+}
+
+/* Remove any Leaflet default padding/margins */
+.leaflet-map-pane {
+    border-radius: 8px;
+}
+
+.leaflet-tile-pane {
+    border-radius: 8px;
 }
 
 .leaflet-control-zoom {

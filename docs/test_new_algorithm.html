@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test New Via X Algorithm</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-result {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        pre {
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        button {
+            background-color: #109a48;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0d7a3a;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>Test New "Via X" Algorithm</h1>
+        <p>This page tests the refactored route finding algorithm to verify it's working correctly.</p>
+        
+        <button onclick="testCalgaryToSantiago()">Test Calgary → Santiago</button>
+        <button onclick="testTorontoToPuntaCana()">Test Toronto → Punta Cana</button>
+        <button onclick="testNewYorkToPuertoPlata()">Test New York → Puerto Plata</button>
+        <button onclick="testAllDestinations()">Test All Destinations</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        let flightVisualizer = null;
+
+        // Initialize the flight visualizer
+        async function initializeVisualizer() {
+            if (flightVisualizer) return flightVisualizer;
+            
+            try {
+                // Create a minimal version of the FlightPathVisualizer for testing
+                const response = await fetch('flights.jsonl');
+                const text = await response.text();
+                const lines = text.trim().split('\n');
+                const flightData = lines.map(line => JSON.parse(line));
+                
+                flightVisualizer = {
+                    flightData: flightData,
+                    destinations: [
+                        { name: 'Puerto Plata', country: 'Dominican Republic' },
+                        { name: 'Santiago', country: 'Dominican Republic' },
+                        { name: 'Santo Domingo', country: 'Dominican Republic' },
+                        { name: 'Punta Cana', country: 'Dominican Republic' }
+                    ]
+                };
+                
+                // Add the helper methods
+                addHelperMethods(flightVisualizer);
+                
+                return flightVisualizer;
+            } catch (error) {
+                console.error('Failed to initialize visualizer:', error);
+                return null;
+            }
+        }
+
+        function addHelperMethods(visualizer) {
+            // Copy the helper methods from the main script
+            visualizer.getDirectServicesFromAirport = function(airportKey) {
+                const services = new Set();
+                const destRecord = this.flightData.find(d => {
+                    const destKey = `${d.destination_city_name}, ${d.destination_country}`;
+                    return destKey === airportKey;
+                });
+                if (destRecord) {
+                    destRecord.direct_services.forEach(service => {
+                        const serviceKey = `${service.origin_city_name}, ${service.origin_country}`;
+                        services.add(serviceKey);
+                    });
+                }
+                return services;
+            };
+
+            visualizer.getAirportsServingOrigin = function(originKey) {
+                const services = new Set();
+                this.flightData.forEach(destRecord => {
+                    const hasService = destRecord.direct_services.some(service => {
+                        const serviceKey = `${service.origin_city_name}, ${service.origin_country}`;
+                        return serviceKey === originKey;
+                    });
+                    if (hasService) {
+                        const destKey = `${destRecord.destination_city_name}, ${destRecord.destination_country}`;
+                        services.add(destKey);
+                    }
+                });
+                return services;
+            };
+
+            visualizer.combineAirportSets = function(set1, set2) {
+                const combined = new Set();
+                set1.forEach(airport => combined.add(airport));
+                set2.forEach(airport => combined.add(airport));
+                return combined;
+            };
+
+            visualizer.findIntersection = function(set1, set2) {
+                const intersection = new Set();
+                set1.forEach(airport => {
+                    if (set2.has(airport)) {
+                        intersection.add(airport);
+                    }
+                });
+                return intersection;
+            };
+
+            visualizer.findDirectFlight = function(originKey, destinationKey) {
+                const [destCity, destCountry] = destinationKey.split(', ');
+                const destData = this.flightData.find(d =>
+                    d.destination_city_name === destCity &&
+                    d.destination_country === destCountry
+                );
+                if (!destData) return null;
+                const directService = destData.direct_services.find(service => {
+                    const serviceOriginKey = `${service.origin_city_name}, ${service.origin_country}`;
+                    return serviceOriginKey === originKey;
+                });
+                return directService || null;
+            };
+        }
+
+        async function testCalgaryToSantiago() {
+            const visualizer = await initializeVisualizer();
+            if (!visualizer) {
+                showResult('error', 'Failed to initialize visualizer');
+                return;
+            }
+
+            const originKey = "Calgary, Canada";
+            const destination = { name: 'Santiago', country: 'Dominican Republic' };
+            
+            showResult('info', `Testing ${originKey} → ${destination.name}, ${destination.country}`);
+            
+            const result = testRouteDiscovery(visualizer, originKey, destination);
+            showResult('success', `Found ${result.transferAirports.size} transfer airports: ${Array.from(result.transferAirports).join(', ')}`);
+            
+            // Check if Boston is included
+            if (result.transferAirports.has('Boston, USA')) {
+                showResult('success', '✅ Boston found as transfer airport for Calgary → Santiago');
+            } else {
+                showResult('error', '❌ Boston NOT found as transfer airport for Calgary → Santiago');
+            }
+            
+            showDetailedResults(result);
+        }
+
+        async function testTorontoToPuntaCana() {
+            const visualizer = await initializeVisualizer();
+            if (!visualizer) return;
+
+            const originKey = "Toronto, Canada";
+            const destination = { name: 'Punta Cana', country: 'Dominican Republic' };
+            
+            showResult('info', `Testing ${originKey} → ${destination.name}, ${destination.country}`);
+            
+            const result = testRouteDiscovery(visualizer, originKey, destination);
+            showResult('success', `Found ${result.transferAirports.size} transfer airports: ${Array.from(result.transferAirports).join(', ')}`);
+            showDetailedResults(result);
+        }
+
+        async function testNewYorkToPuertoPlata() {
+            const visualizer = await initializeVisualizer();
+            if (!visualizer) return;
+
+            const originKey = "New York, USA";
+            const destination = { name: 'Puerto Plata', country: 'Dominican Republic' };
+            
+            showResult('info', `Testing ${originKey} → ${destination.name}, ${destination.country}`);
+            
+            const result = testRouteDiscovery(visualizer, originKey, destination);
+            showResult('success', `Found ${result.transferAirports.size} transfer airports: ${Array.from(result.transferAirports).join(', ')}`);
+            showDetailedResults(result);
+        }
+
+        async function testAllDestinations() {
+            const visualizer = await initializeVisualizer();
+            if (!visualizer) return;
+
+            const testOrigins = ["Calgary, Canada", "Toronto, Canada", "New York, USA", "Boston, USA"];
+            
+            for (const origin of testOrigins) {
+                showResult('info', `\n=== Testing from ${origin} ===`);
+                
+                for (const dest of visualizer.destinations) {
+                    const result = testRouteDiscovery(visualizer, origin, dest);
+                    showResult('success', `${origin} → ${dest.name}: ${result.transferAirports.size} transfer airports`);
+                }
+            }
+        }
+
+        function testRouteDiscovery(visualizer, originKey, destination) {
+            // Step 1-3: Get services for starting airport
+            const servicesStartingAirport1 = visualizer.getDirectServicesFromAirport(originKey);
+            const servicesStartingAirport2 = visualizer.getAirportsServingOrigin(originKey);
+            const servicesStartingAirportCombined = visualizer.combineAirportSets(servicesStartingAirport1, servicesStartingAirport2);
+
+            // Step 4-6: Get services for ending airport
+            const servicesEndingAirport1 = visualizer.getDirectServicesFromAirport(`${destination.name}, ${destination.country}`);
+            const servicesEndingAirport2 = visualizer.getAirportsServingOrigin(`${destination.name}, ${destination.country}`);
+            const servicesEndingAirportCombined = visualizer.combineAirportSets(servicesEndingAirport1, servicesEndingAirport2);
+
+            // Find intersection
+            const transferAirports = visualizer.findIntersection(servicesStartingAirportCombined, servicesEndingAirportCombined);
+
+            // Check for direct flight
+            const directFlight = visualizer.findDirectFlight(originKey, `${destination.name}, ${destination.country}`);
+
+            return {
+                servicesStartingAirport1,
+                servicesStartingAirport2,
+                servicesStartingAirportCombined,
+                servicesEndingAirport1,
+                servicesEndingAirport2,
+                servicesEndingAirportCombined,
+                transferAirports,
+                directFlight
+            };
+        }
+
+        function showResult(type, message) {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `test-result ${type}`;
+            resultDiv.textContent = message;
+            resultsDiv.appendChild(resultDiv);
+        }
+
+        function showDetailedResults(result) {
+            const details = `
+Starting Airport Services (1): ${Array.from(result.servicesStartingAirport1).slice(0, 10).join(', ')}${result.servicesStartingAirport1.size > 10 ? '...' : ''}
+Starting Airport Services (2): ${Array.from(result.servicesStartingAirport2).slice(0, 10).join(', ')}${result.servicesStartingAirport2.size > 10 ? '...' : ''}
+Combined Starting Services: ${result.servicesStartingAirportCombined.size} airports
+Ending Airport Services (1): ${Array.from(result.servicesEndingAirport1).slice(0, 10).join(', ')}${result.servicesEndingAirport1.size > 10 ? '...' : ''}
+Ending Airport Services (2): ${Array.from(result.servicesEndingAirport2).slice(0, 10).join(', ')}${result.servicesEndingAirport2.size > 10 ? '...' : ''}
+Combined Ending Services: ${result.servicesEndingAirportCombined.size} airports
+Transfer Airports (Intersection): ${Array.from(result.transferAirports).join(', ')}
+Direct Flight Available: ${result.directFlight ? 'Yes' : 'No'}
+            `;
+            
+            const pre = document.createElement('pre');
+            pre.textContent = details;
+            document.getElementById('results').appendChild(pre);
+        }
+    </script>
+</body>
+</html>
