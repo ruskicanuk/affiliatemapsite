@@ -67,6 +67,42 @@ The code now uses the exact terminology specified:
 - **Flight 2**: Uses union of ServicesEndingAirport1 and ServicesEndingAirport2
 - Maintains existing airline service detail display format
 
+## Volume Factor Calculation Update
+
+### New Duration-Weighted Volume Calculation
+The volume factor calculation has been completely refactored to provide more accurate flight volume representation:
+
+#### For Direct Flights:
+- **Single segment calculation**: Uses existing volume calculation for the direct flight
+- **Formula**: `volume = Σ(months_per_year × flights_per_week) / 84`
+
+#### For Connecting Flights (NEW):
+- **Separate calculations**: Each flight leg gets its own volume factor
+- **Duration weighting**: Overall volume is weighted by flight duration (excluding shuttle)
+- **Formula**: `overall_volume = (weight1 × volume1) + (weight2 × volume2)`
+
+#### Example: Winnipeg → Calgary → Puerto Plata
+```
+Flight 1 (Winnipeg → Calgary):
+- 5 airlines: 3 fly 7 days/week year-round, 2 fly 3 days/week year-round
+- Volume1 = (12×7 + 12×7 + 12×7 + 12×3 + 12×3) / 84 = 3.85
+
+Flight 2 (Calgary → Puerto Plata):
+- Volume2 = 0.5 (calculated similarly)
+
+Duration Weights:
+- Flight 1 duration: 120 minutes (25% of total)
+- Flight 2 duration: 360 minutes (75% of total)
+
+Overall Volume Factor:
+- 0.25 × 3.85 + 0.75 × 0.5 = 1.34
+```
+
+#### Efficiency Ratio Update:
+- **New formula**: `efficiency_ratio = total_duration / overall_volume_factor`
+- **Sorting**: Direct flights first, then connecting flights by efficiency (lowest to highest)
+- **UI Display**: The overall volume factor is shown in the "Daily Flight Volume" bar
+
 ## Expected Improvements
 
 ### 1. More Comprehensive Route Discovery
@@ -74,11 +110,16 @@ The code now uses the exact terminology specified:
 - **Calgary → Santiago "via Boston"**: Should now appear if Boston serves both Calgary and Santiago routes
 - **Systematic approach**: No longer relies on bidirectional guessing
 
-### 2. Cleaner Data Structure
+### 2. More Accurate Volume Representation
+- **Individual flight volumes**: Each leg calculated separately for connecting flights
+- **Duration-weighted averaging**: Longer flights have more influence on overall volume
+- **Better sorting**: Routes sorted by true efficiency (duration vs. volume)
+
+### 3. Cleaner Data Structure
 - **Eliminated duplicates**: Merged duplicate destination records
 - **Consistent data**: All flight information properly consolidated
 
-### 3. Performance Benefits
+### 4. Performance Benefits
 - **Set operations**: More efficient than nested loops
 - **Clear logic flow**: Easier to debug and maintain
 - **Predictable results**: Deterministic intersection-based approach
@@ -90,6 +131,11 @@ The code now uses the exact terminology specified:
 3. **Test direct flights**: Ensure direct flights always appear first
 4. **Test all 4 destinations**: Verify each column shows appropriate "Via X" options
 5. **Test flight details**: Confirm airline information displays correctly for both legs
+6. **Test volume calculations**:
+   - Check Winnipeg → Calgary → Puerto Plata for debug logging
+   - Verify volume bars reflect duration-weighted calculations
+   - Confirm connecting flights are sorted by efficiency ratio
+7. **Test sorting**: Verify routes are ordered by efficiency (duration/volume) with direct flights first
 
 ## Debugging Features
 
@@ -97,6 +143,11 @@ The new algorithm provides clear debugging points:
 - Log `servicesStartingAirportCombined` to see all airports reachable from origin
 - Log `servicesEndingAirportCombined` to see all airports that can reach destination
 - Log `transferAirports` to see the intersection (actual "Via X" options)
+- **Volume calculation debugging**: Special logging for Winnipeg → Calgary → Puerto Plata route showing:
+  - Individual flight volumes and durations
+  - Duration weights for each leg
+  - Overall volume factor calculation
+  - Final efficiency ratio
 
 ## Files Modified
 

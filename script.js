@@ -461,12 +461,12 @@ class FlightPathVisualizer {
 
         // Calculate efficiency ratio for each route and sort
         routes.forEach(route => {
-            const volume = this.calculateRouteVolume(route);
-            route.volumeFactor = Math.max(volume, 0.1);
+            const overallVolumeFactor = this.calculateRouteVolume(route);
+            route.volumeFactor = Math.max(overallVolumeFactor, 0.1);
             route.efficiencyRatio = route.duration / route.volumeFactor;
         });
 
-        // Sort routes: direct flights first, then connecting flights by efficiency
+        // Sort routes: direct flights first, then connecting flights by efficiency (lowest to highest)
         const directFlights = routes.filter(r => r.type === 'direct');
         const connectingFlights = routes.filter(r => r.type === 'connecting')
             .sort((a, b) => a.efficiencyRatio - b.efficiencyRatio);
@@ -694,22 +694,56 @@ class FlightPathVisualizer {
     }
 
     calculateRouteVolume(route) {
+        if (route.type === 'direct') {
+            // For direct flights, calculate volume normally
+            return this.calculateSegmentVolume(route.segments[0]);
+        } else {
+            // For connecting flights, calculate duration-weighted average
+            const segment1 = route.segments[0]; // Flight 1
+            const segment2 = route.segments[1]; // Flight 2
+
+            const volume1 = this.calculateSegmentVolume(segment1);
+            const volume2 = this.calculateSegmentVolume(segment2);
+
+            const duration1 = segment1.flight_duration_minutes;
+            const duration2 = segment2.flight_duration_minutes;
+            const totalDuration = duration1 + duration2;
+
+            // Calculate duration weights (excluding shuttle portion)
+            const weight1 = duration1 / totalDuration;
+            const weight2 = duration2 / totalDuration;
+
+            // Calculate duration-weighted average volume
+            const overallVolumeFactor = (weight1 * volume1) + (weight2 * volume2);
+
+            // Debug logging for specific routes
+            if (segment1.origin_city_name === "Winnipeg" && segment2.destination_city_name === "Puerto Plata") {
+                console.log(`DEBUG: Winnipeg -> Calgary -> Puerto Plata volume calculation:`);
+                console.log(`  Flight 1 (${segment1.origin_city_name} -> ${segment1.destination_city_name}): duration=${duration1}min, volume=${volume1.toFixed(3)}, weight=${weight1.toFixed(3)}`);
+                console.log(`  Flight 2 (${segment2.origin_city_name} -> ${segment2.destination_city_name}): duration=${duration2}min, volume=${volume2.toFixed(3)}, weight=${weight2.toFixed(3)}`);
+                console.log(`  Overall volume factor: ${overallVolumeFactor.toFixed(3)}`);
+                console.log(`  Efficiency ratio: ${(duration1 + duration2) / overallVolumeFactor}`);
+            }
+
+            return overallVolumeFactor;
+        }
+    }
+
+    calculateSegmentVolume(segment) {
         let totalVolume = 0;
 
-        route.segments.forEach(segment => {
-            segment.airlines.forEach(airline => {
-                // Calculate months per year
-                let monthsPerYear;
-                if (airline.service_start_month === 'Jan' && airline.service_end_month === 'Dec') {
-                    monthsPerYear = 12;
-                } else {
-                    // Simplified calculation - could be enhanced for exact month counting
-                    monthsPerYear = 6; // Average seasonal operation
-                }
+        segment.airlines.forEach(airline => {
+            // Calculate months per year
+            let monthsPerYear;
+            if (airline.service_start_month === 'Jan' && airline.service_end_month === 'Dec') {
+                monthsPerYear = 12;
+            } else {
+                // Simplified calculation - could be enhanced for exact month counting
+                monthsPerYear = 6; // Average seasonal operation
+            }
 
-                const flightsPerWeek = airline.days_per_week;
-                totalVolume += (monthsPerYear * flightsPerWeek);
-            });
+            const flightsPerWeek = airline.days_per_week;
+            totalVolume += (monthsPerYear * flightsPerWeek);
         });
 
         return totalVolume / 84; // Normalize by dividing by 84
