@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Flight Path Visualizer - Explore Global Routes</title>
+    <title>Getting to Green Office</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✈️</text></svg>">
 
     <!-- Leaflet CSS -->
@@ -16,80 +16,75 @@
     <div class="container">
         <!-- Header -->
         <header class="header">
-            <h1 class="title">✈️ Flight Path Visualizer</h1>
-            <p class="subtitle">Discover beautiful flight routes around the world</p>
-        </header>
-
-        <!-- Controls -->
-        <div class="controls">
-            <div class="control-group">
-                <label for="origin-select" class="control-label">
-                    <span class="icon">🛫</span>
-                    Origin City
-                </label>
-                <select id="origin-select" class="control-select">
+            <h1 class="title">
+                Getting to
+                <img src="assets/logo-final-2023-05-20.svg" alt="Green Office" class="logo" onerror="this.style.display='none'">
+                from
+                <select id="origin-select" class="header-origin-select">
                     <option value="">Select origin city...</option>
                 </select>
+            </h1>
+        </header>
+
+        <!-- Maps Container -->
+        <div class="maps-container">
+            <div class="map-section">
+                <div class="map-container">
+                    <div id="world-map" class="map"></div>
+                    <div class="map-overlay">
+                        <div class="loading" id="loading">
+                            <div class="loading-spinner"></div>
+                            <p>Loading flight data...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
-
-            <div class="control-group">
-                <label for="destination-select" class="control-label">
-                    <span class="icon">🛬</span>
-                    Destination City
-                </label>
-                <select id="destination-select" class="control-select" disabled>
-                    <option value="">Select destination city...</option>
-                </select>
-            </div>
-
-            <button id="clear-route" class="clear-btn" disabled>
-                <span class="icon">🗑️</span>
-                Clear Route
-            </button>
-        </div>
-
-        <!-- Map Container -->
-        <div class="map-container">
-            <div id="map" class="map"></div>
-            <div class="map-overlay">
-                <div class="loading" id="loading">
-                    <div class="loading-spinner"></div>
-                    <p>Loading flight data...</p>
+            <div class="map-section">
+                <div class="image-container">
+                    <img id="destination-image" class="destination-image" src="assets/fromPuertoPlata.jpg" alt="Destination View">
                 </div>
             </div>
         </div>
 
-        <!-- Flight Details -->
+        <!-- Travel Options -->
+        <div class="flight-options" id="flight-options" style="display: none;">
+            <h3 class="options-title">Travel Options</h3>
+            <div class="options-grid">
+                <div class="destination-column">
+                    <h4 class="destination-header">Puerto Plata</h4>
+                    <div class="flight-buttons" id="puerto-plata-options"></div>
+                </div>
+                <div class="destination-column">
+                    <h4 class="destination-header">Santiago</h4>
+                    <div class="flight-buttons" id="santiago-options"></div>
+                </div>
+                <div class="destination-column">
+                    <h4 class="destination-header">Santo Domingo</h4>
+                    <div class="flight-buttons" id="santo-domingo-options"></div>
+                </div>
+                <div class="destination-column">
+                    <h4 class="destination-header">Punta Cana</h4>
+                    <div class="flight-buttons" id="punta-cana-options"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Travel Details -->
         <div class="flight-details" id="flight-details" style="display: none;">
-            <h3 class="details-title">Flight Information</h3>
+            <h3 class="details-title" id="details-title">Travel Details</h3>
             <div class="details-content">
-                <div class="route-info">
-                    <div class="route-segment">
-                        <span class="route-label">From:</span>
-                        <span class="route-value" id="route-origin">-</span>
+                <div class="travel-segments">
+                    <div class="segment-column" id="first-segment">
+                        <h4 class="segment-header">✈️ 1st Flight</h4>
+                        <div class="segment-content"></div>
                     </div>
-                    <div class="route-segment">
-                        <span class="route-label">To:</span>
-                        <span class="route-value" id="route-destination">-</span>
+                    <div class="segment-column" id="second-segment" style="display: none;">
+                        <h4 class="segment-header">✈️ 2nd Flight</h4>
+                        <div class="segment-content"></div>
                     </div>
-                    <div class="route-segment">
-                        <span class="route-label">Duration:</span>
-                        <span class="route-value" id="route-duration">-</span>
-                    </div>
-                    <div class="route-segment">
-                        <span class="route-label">Airlines:</span>
-                        <span class="route-value" id="route-airlines">-</span>
-                    </div>
-                </div>
-                <div class="transfer-info" id="transfer-info" style="display: none;">
-                    <h4 class="transfer-title">Via Transfer</h4>
-                    <div class="route-segment">
-                        <span class="route-label">Transfer City:</span>
-                        <span class="route-value" id="transfer-city">-</span>
-                    </div>
-                    <div class="route-segment">
-                        <span class="route-label">Total Duration:</span>
-                        <span class="route-value" id="total-duration">-</span>
+                    <div class="segment-column" id="shuttle-segment">
+                        <h4 class="segment-header">🚐 Shuttle to <img src="assets/logo-final-2023-05-20.svg" class="inline-logo" alt="Green Office"></h4>
+                        <div class="segment-content"></div>
                     </div>
                 </div>
             </div>
@@ -97,7 +92,6 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>Powered by Leaflet.js • Map data from Natural Earth</p>
         </footer>
     </div>
 

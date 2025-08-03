@@ -7,7 +7,7 @@
 
 body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: #ffffff;
     min-height: 100vh;
     color: #333;
     line-height: 1.6;
@@ -26,23 +26,59 @@ body {
 .header {
     text-align: center;
     margin-bottom: 30px;
-    color: white;
+    color: #333;
 }
 
 .title {
-    font-size: 3rem;
+    font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 10px;
     text-shadow: 0 2px 4px rgba(0,0,0,0.3);
     animation: fadeInDown 1s ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
 }
 
-.subtitle {
-    font-size: 1.2rem;
-    opacity: 0.9;
-    font-weight: 300;
-    animation: fadeInUp 1s ease-out 0.3s both;
+.logo {
+    height: 58px; /* Increased by 30% from 45px */
+    margin: 0 10px;
+    vertical-align: middle;
+    max-width: 260px; /* Increased proportionally */
 }
+
+.header-origin-select {
+    font-size: 1.2rem; /* Match the 'Getting' text size */
+    font-weight: 600; /* Match the 'Getting' text weight */
+    color: #000000;
+    background: rgba(255,255,255,0.95);
+    border: 2px solid black; /* Changed to black border */
+    border-radius: 12px;
+    padding: 8px 16px;
+    margin-left: 10px;
+    vertical-align: middle;
+    backdrop-filter: blur(10px);
+    transition: all 0.3s ease;
+    width: auto; /* Auto-size to content */
+    min-width: 200px;
+    max-width: 400px;
+}
+
+.header-origin-select:focus {
+    outline: none;
+    border-color: black;
+    box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+}
+
+.header-origin-select option {
+    color: #333;
+    background: white;
+    font-size: 1rem;
+    font-weight: 400;
+}
+
+
 
 /* Controls Styles */
 .controls {
@@ -89,15 +125,15 @@ body {
 }
 
 .control-select:hover {
-    border-color: #ffd700;
+    border-color: #22c55e;
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.15);
 }
 
 .control-select:focus {
     outline: none;
-    border-color: #ffd700;
-    box-shadow: 0 0 0 3px rgba(255,215,0,0.3);
+    border-color: #22c55e;
+    box-shadow: 0 0 0 3px rgba(34,197,94,0.3);
 }
 
 .control-select:disabled {
@@ -133,21 +169,82 @@ body {
     transform: none;
 }
 
-/* Map Container */
+/* Color Variables */
+:root {
+    --primary-green: rgb(16, 154, 72);
+    --primary-green-light: rgba(16, 154, 72, 0.1);
+    --primary-green-medium: rgba(16, 154, 72, 0.3);
+    --primary-green-dark: rgba(16, 154, 72, 0.9);
+}
+
+/* Maps Container */
+.maps-container {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px; /* Reduced from 20px for more compact layout */
+    margin-bottom: 15px; /* Reduced from 20px */
+    animation: slideInUp 0.5s ease-out 0.6s both;
+}
+
+.map-section {
+    background: rgba(255,255,255,0.95);
+    border-radius: 16px;
+    padding: 15px; /* Reduced from 20px */
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
 .map-container {
     position: relative;
-    flex: 1;
-    min-height: 500px;
-    border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    animation: fadeInUp 1s ease-out 0.9s both;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.1);
+    /* Fuzzy border effect */
+    border: 1px solid rgba(0,0,0,0.1);
+    background: linear-gradient(45deg, rgba(255,255,255,0.8), rgba(255,255,255,0.4));
+    padding: 2px;
+}
+
+.map-container::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, rgba(0,0,0,0.1), rgba(0,0,0,0.05), rgba(0,0,0,0.1));
+    border-radius: 14px;
+    z-index: -1;
+    filter: blur(3px);
 }
 
 .map {
     width: 100%;
-    height: 100%;
-    min-height: 500px;
+    height: 380px; /* Reduced from 400px for more compact layout */
+    transition: opacity 0.5s ease-in-out;
+}
+
+.map.fade-out {
+    opacity: 0.3;
+}
+
+/* Destination Image Styles */
+.image-container {
+    position: relative;
+    overflow: hidden;
+    border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.1);
+}
+
+.destination-image {
+    width: 100%;
+    height: 380px;
+    object-fit: cover;
+    transition: opacity 0.5s ease-in-out;
+}
+
+.destination-image.fade-out {
+    opacity: 0;
 }
 
 .map-overlay {
@@ -179,6 +276,191 @@ body {
     margin: 0 auto 15px;
 }
 
+/* Flight Options */
+.flight-options {
+    background: rgba(255,255,255,0.95);
+    border-radius: 16px;
+    padding: 18px; /* Reduced from 25px */
+    margin-top: 15px; /* Reduced from 20px */
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.3);
+    animation: slideInUp 0.5s ease-out;
+}
+
+.options-title {
+    color: #109a48;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.options-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 20px;
+}
+
+.destination-column {
+    background: rgba(34,197,94,0.1);
+    border-radius: 12px;
+    padding: 15px;
+    border: 2px solid rgba(34,197,94,0.2);
+    height: 250px; /* Reduced from ~500px to 250px (50% reduction) */
+    overflow-y: auto; /* Add vertical scroll */
+    display: flex;
+    flex-direction: column;
+}
+
+.destination-column::-webkit-scrollbar {
+    width: 8px;
+}
+
+.destination-column::-webkit-scrollbar-track {
+    background: rgba(34,197,94,0.1);
+    border-radius: 4px;
+}
+
+.destination-column::-webkit-scrollbar-thumb {
+    background: rgba(16,154,72,0.4);
+    border-radius: 4px;
+}
+
+.destination-column::-webkit-scrollbar-thumb:hover {
+    background: rgba(16,154,72,0.6);
+}
+
+.destination-header {
+    color: var(--primary-green);
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 15px;
+    text-align: center;
+    border-bottom: 2px solid var(--primary-green-medium);
+    padding-bottom: 8px;
+    flex-shrink: 0; /* Prevent header from shrinking */
+}
+
+.flight-buttons {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px; /* Space for scrollbar */
+}
+
+.flight-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.flight-option-btn {
+    background: white;
+    border: 2px solid var(--primary-green);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--primary-green);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+}
+
+.flight-option-btn:hover {
+    background: var(--primary-green);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px var(--primary-green-medium);
+}
+
+.flight-option-btn.selected {
+    background: var(--primary-green);
+    color: white;
+    border-color: var(--primary-green);
+}
+
+.button-content {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.route-type-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.route-type {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+.volume-duration-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.volume-section {
+    flex: 0 0 80%; /* Takes 80% of the row */
+}
+
+.duration-section {
+    flex: 0 0 20%; /* Takes 20% of the row */
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.volume-indicator {
+    width: 100%;
+    height: 8px;
+    background: var(--primary-green-light);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid var(--primary-green-medium);
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.volume-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary-green), rgba(16, 154, 72, 0.7));
+    transition: width 0.3s ease;
+}
+
+/* Volume indicator hover effect */
+.flight-option-btn:hover .volume-indicator {
+    background: white;
+    border-color: #ccc;
+    height: 16px; /* Increase height to accommodate text */
+}
+
+.flight-option-btn:hover .volume-fill {
+    background: white;
+}
+
+.flight-option-btn:hover .volume-indicator::after {
+    content: "Flight Volume";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: black;
+    white-space: nowrap;
+}
+
+.flight-option-btn .duration {
+    font-size: 0.8rem;
+    opacity: 0.8;
+}
+
 /* Flight Details */
 .flight-details {
     background: rgba(255,255,255,0.95);
@@ -191,69 +473,120 @@ body {
 }
 
 .details-title {
-    color: #667eea;
+    color: var(--primary-green);
     font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    text-align: center;
 }
 
-.details-title::before {
-    content: "📊";
-    font-size: 1.2rem;
-}
-
-.details-content {
+.travel-segments {
     display: grid;
+    grid-template-columns: 1fr 1fr 1fr; /* Changed to 3 columns */
     gap: 20px;
 }
 
-.route-info {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 15px;
-}
-
-.route-segment {
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
-}
-
-.route-label {
-    font-weight: 600;
-    color: #666;
-    font-size: 0.9rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.route-value {
-    font-weight: 500;
-    color: #333;
-    font-size: 1.1rem;
-}
-
-.transfer-info {
-    background: linear-gradient(135deg, #ffd700, #ffed4e);
-    padding: 20px;
+.segment-column {
+    background: var(--primary-green-light);
     border-radius: 12px;
-    color: #333;
+    padding: 15px;
+    border: 1px solid var(--primary-green-medium);
 }
 
-.transfer-title {
-    font-size: 1.2rem;
-    font-weight: 700;
+.segment-header {
+    color: var(--primary-green);
+    font-size: 1.1rem;
+    font-weight: 600;
     margin-bottom: 15px;
+    text-align: center;
+    border-bottom: 2px solid var(--primary-green-medium);
+    padding-bottom: 8px;
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
 }
 
-.transfer-title::before {
-    content: "🔄";
+.inline-logo {
+    height: 20px;
+    vertical-align: middle;
+}
+
+/* Travel Details Header Logo - 100% increase */
+.details-title .inline-logo {
+    height: 40px;
+}
+
+/* Shuttle Segment Logo - 20% increase */
+.segment-header .inline-logo {
+    height: 24px;
+}
+
+.airlines-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.airline-item {
+    background: white;
+    border-radius: 8px;
+    padding: 8px 10px; /* Reduced padding for more compact display */
+    border: 1px solid rgba(34,197,94,0.2);
+    font-size: 0.85rem; /* Slightly smaller font for better fit */
+    color: #333;
+    margin-bottom: 4px; /* Reduced margin */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.airline-name {
+    flex: 1;
+    text-align: left;
+    font-weight: 600;
+}
+
+.airline-season {
+    flex: 1;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+}
+
+.airline-frequency {
+    flex: 1;
+    text-align: right;
+    font-weight: 500;
+    color: var(--primary-green);
+}
+
+.calendar-icon {
+    font-size: 0.8rem;
+}
+
+.month-text {
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+/* Small Seasonal Arrow Styles */
+.seasonal-arrow {
+    display: inline-flex;
+    align-items: center;
+    margin: 0 4px;
+}
+
+.small-arrow-icon {
+    width: 12px; /* 1/5 of original 60px */
+    height: 12px;
+    vertical-align: middle;
+}
+
+.details-content {
+    display: block;
 }
 
 /* Footer */
@@ -311,8 +644,22 @@ body {
     
     .title {
         font-size: 2.2rem;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
     }
-    
+
+    .header-origin-select {
+        font-size: 1.5rem;
+        margin: 10px 0 0 0;
+        min-width: 300px; /* Increased for mobile */
+        max-width: 400px; /* Increased for mobile */
+    }
+
+    .logo {
+        margin: 0 5px;
+    }
+
     .subtitle {
         font-size: 1rem;
     }
@@ -325,8 +672,16 @@ body {
     .control-group {
         min-width: auto;
     }
-    
-    .route-info {
+
+    .maps-container {
+        grid-template-columns: 1fr;
+    }
+
+    .options-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .travel-segments {
         grid-template-columns: 1fr;
     }
     
@@ -338,16 +693,176 @@ body {
 @media (max-width: 480px) {
     .title {
         font-size: 1.8rem;
+        flex-direction: column;
+        gap: 10px;
     }
-    
+
+    .options-grid {
+        grid-template-columns: 1fr;
+    }
+
     .flight-details {
         padding: 20px;
     }
+
+    .travel-segments {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dominican Republic Map Markers */
+.dr-destination-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.dr-marker-content {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    background: transparent; /* Removed background from entire marker */
+    color: #109a48;
+    padding: 4px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.dr-marker-content:hover .dr-marker-label {
+    background: rgba(16, 154, 72, 0.1);
+    transform: scale(1.05);
+}
+
+.dr-marker-content.selected .dr-marker-label {
+    background: rgba(34, 197, 94, 0.9);
+    color: white;
+    transform: scale(1.1);
+}
+
+.dr-marker-icon {
+    margin-right: 8px;
+    font-size: 1.1rem;
+    background: transparent; /* No background for icon */
+    filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.3));
+}
+
+.dr-marker-label {
+    background: rgba(255,255,255,0.9); /* Background only on text label */
+    color: #109a48;
+    border-radius: 12px;
+    padding: 4px 8px;
+    white-space: nowrap;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    border: 1px solid rgba(16,154,72,0.3);
+    transition: all 0.3s ease;
+}
+
+/* Green Office Marker Styles */
+.green-office-marker {
+    background: transparent !important;
+    border: none !important;
+}
+
+.office-marker-content {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    padding: 0;
+    width: 30px;
+    height: 30px;
+}
+
+.office-logo {
+    height: 30px;
+    width: auto;
+    filter: drop-shadow(2px 2px 4px rgba(0,0,0,0.3));
+}
+
+/* Duration Arrow Styles */
+.duration-arrow {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+    margin: 0 8px;
+}
+
+.arrow-icon {
+    width: 60px;
+    height: 20px;
+    vertical-align: middle;
+    order: 2; /* Arrow appears below text */
+}
+
+.duration-text {
+    font-size: 1.08rem; /* Increased by 20% from 0.9rem */
+    font-weight: 700;
+    color: black;
+    white-space: nowrap;
+    order: 1; /* Text appears above arrow */
+    margin-bottom: 1px; /* Reduced from 2px to bring arrow closer */
+}
+
+/* World Map Markers */
+.custom-div-icon {
+    background: transparent !important;
+    border: none !important;
+}
+
+.custom-marker {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+    background: transparent;
+    border: none;
+    padding: 2px;
+}
+
+.custom-marker.origin .marker-label {
+    background: rgba(59, 130, 246, 0.9); /* Blue background for origin text */
+    color: white;
+    border: 2px solid #1d4ed8;
+    border-radius: 12px;
+    padding: 4px 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.custom-marker.destination .marker-label {
+    background: rgba(16, 154, 72, 0.9); /* Green background for destination text */
+    color: white;
+    border: 2px solid #0f5132;
+    border-radius: 12px;
+    padding: 4px 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.custom-marker.transfer .marker-label {
+    background: rgba(251, 191, 36, 0.9); /* Yellow background for transfer text */
+    color: #92400e;
+    border: 2px solid #d97706;
+    border-radius: 12px;
+    padding: 4px 8px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.marker-icon {
+    margin-left: 5px; /* Changed from margin-right to margin-left */
+    font-size: 1rem;
+    background: transparent;
+    filter: drop-shadow(1px 1px 2px rgba(0,0,0,0.5));
+}
+
+.marker-label {
+    white-space: nowrap;
 }
 
 /* Custom Map Styles */
 .leaflet-container {
-    background: #1e3a8a;
+    background: rgb(137, 216, 236); /* Updated ocean color to match DR images */
 }
 
 .leaflet-control-zoom {
@@ -357,14 +872,14 @@ body {
 
 .leaflet-control-zoom a {
     background: rgba(255,255,255,0.95) !important;
-    color: #667eea !important;
+    color: #22c55e !important;
     border: none !important;
     font-weight: bold !important;
     transition: all 0.3s ease !important;
 }
 
 .leaflet-control-zoom a:hover {
-    background: #667eea !important;
+    background: #22c55e !important;
     color: white !important;
     transform: scale(1.05);
 }
