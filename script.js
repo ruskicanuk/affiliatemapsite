@@ -63,7 +63,7 @@ class FlightPathVisualizer {
     }
 
     async loadFlightData() {
-        const response = await fetch('flightsOnetoOne.jsonl');
+        const response = await fetch('flightsonetoone.jsonl');
         if (!response.ok) {
             throw new Error('Failed to load flight data');
         }
