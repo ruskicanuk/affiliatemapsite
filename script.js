@@ -14,6 +14,7 @@ class FlightPathVisualizer {
         this.LABEL_SEPARATION_PIXELS = 35; // Configurable label separation distance
         this.selectedOrigin = null;
         this.selectedRoute = null;
+        this.zoomCache = new Map(); // Cache zoom levels for route combinations
 
         // Fixed Dominican Republic destinations with coordinates
         this.destinations = [
@@ -62,7 +63,7 @@ class FlightPathVisualizer {
     }
 
     async loadFlightData() {
-        const response = await fetch('flights.jsonl');
+        const response = await fetch('flightsOnetoOne.jsonl');
         if (!response.ok) {
             throw new Error('Failed to load flight data');
         }
@@ -79,7 +80,7 @@ class FlightPathVisualizer {
             }
         }).filter(item => item !== null); // Remove any failed parses
 
-        console.log('Flight data loaded:', this.flightData.length, 'destinations');
+        console.log('Flight data loaded:', this.flightData.length, 'airport pairs');
     }
 
     initMaps() {
@@ -90,7 +91,13 @@ class FlightPathVisualizer {
             minZoom: 2,
             maxZoom: 10,
             zoomControl: false, // Remove zoom controls
-            attributionControl: false
+            attributionControl: false,
+            dragging: false, // Disable panning
+            touchZoom: false, // Disable touch zoom
+            doubleClickZoom: false, // Disable double-click zoom
+            scrollWheelZoom: false, // Disable scroll wheel zoom
+            boxZoom: false, // Disable box zoom
+            keyboard: false // Disable keyboard navigation
         });
 
         // Initialize destination image mapping
@@ -159,29 +166,71 @@ class FlightPathVisualizer {
 
     populateOriginDropdown() {
         const originSelect = document.getElementById('origin-select');
-        const origins = new Set();
+        const origins = new Map(); // IATA -> {city, country, displayName}
 
-        // Dominican Republic cities to exclude from origin options
-        const drCities = this.destinations.map(dest => `${dest.name}, ${dest.country}`);
+        // Dominican Republic IATA codes to exclude from origin options
+        const drIataCodes = this.destinations.map(dest => dest.iata);
 
-        // Collect all unique origin cities
-        this.flightData.forEach(destination => {
-            destination.direct_services.forEach(service => {
-                const originKey = `${service.origin_city_name}, ${service.origin_country}`;
-                // Exclude Dominican Republic destination cities from origin options
-                if (!drCities.includes(originKey)) {
-                    origins.add(originKey);
-                }
+        // Step 1: Collect airports with direct routes to DR destinations
+        this.flightData.forEach(airportPair => {
+            // Check if either airport is a DR destination
+            const airport1IsDR = drIataCodes.includes(airportPair.airport1_iata);
+            const airport2IsDR = drIataCodes.includes(airportPair.airport2_iata);
+
+            // Add the non-DR airport as a potential origin
+            if (airport1IsDR && !drIataCodes.includes(airportPair.airport2_iata)) {
+                const iata = airportPair.airport2_iata;
+                const city = airportPair.airport2_city_name;
+                const country = airportPair.airport2_country;
+                const displayName = `${city}, ${country}`;
+                origins.set(iata, {city, country, displayName});
+            } else if (airport2IsDR && !drIataCodes.includes(airportPair.airport1_iata)) {
+                const iata = airportPair.airport1_iata;
+                const city = airportPair.airport1_city_name;
+                const country = airportPair.airport1_country;
+                const displayName = `${city}, ${country}`;
+                origins.set(iata, {city, country, displayName});
+            }
+        });
+
+        // Step 2: Add airports with connecting routes (2-hop routes)
+        // Get all airports that connect to the direct-route airports
+        const directRouteAirports = new Set(origins.keys());
+
+        this.flightData.forEach(airportPair => {
+            const airport1Iata = airportPair.airport1_iata;
+            const airport2Iata = airportPair.airport2_iata;
+
+            // If airport1 connects to a direct-route airport, add airport2 as potential origin
+            if (directRouteAirports.has(airport1Iata) && !drIataCodes.includes(airport2Iata) && !origins.has(airport2Iata)) {
+                const iata = airport2Iata;
+                const city = airportPair.airport2_city_name;
+                const country = airportPair.airport2_country;
+                const displayName = `${city}, ${country}`;
+                origins.set(iata, {city, country, displayName});
+            }
+
+            // If airport2 connects to a direct-route airport, add airport1 as potential origin
+            if (directRouteAirports.has(airport2Iata) && !drIataCodes.includes(airport1Iata) && !origins.has(airport1Iata)) {
+                const iata = airport1Iata;
+                const city = airportPair.airport1_city_name;
+                const country = airportPair.airport1_country;
+                const displayName = `${city}, ${country}`;
+                origins.set(iata, {city, country, displayName});
+            }
+        });
+
+        // Sort by display name and populate dropdown
+        Array.from(origins.entries())
+            .sort((a, b) => a[1].displayName.localeCompare(b[1].displayName))
+            .forEach(([iata, airport]) => {
+                const option = document.createElement('option');
+                option.value = iata; // Use IATA code as value
+                option.textContent = `${airport.displayName} (${iata})`; // Display city, country (IATA)
+                option.dataset.city = airport.city;
+                option.dataset.country = airport.country;
+                originSelect.appendChild(option);
             });
-        });
-
-        // Sort and populate dropdown
-        Array.from(origins).sort().forEach(origin => {
-            const option = document.createElement('option');
-            option.value = origin;
-            option.textContent = origin;
-            originSelect.appendChild(option);
-        });
     }
 
     async detectUserLocation() {
@@ -265,17 +314,32 @@ class FlightPathVisualizer {
         let closestAirport = null;
         let minDistance = Infinity;
 
-        // Create a set of all unique airports from flight data
-        const airports = new Set();
-        this.flightData.forEach(destination => {
-            destination.direct_services.forEach(service => {
-                const coords = this.parseCoordinates(service.origin_airport_coordinates);
-                airports.add({
-                    name: `${service.origin_city_name}, ${service.origin_country}`,
-                    lat: coords[0],
-                    lng: coords[1]
+        // Create a map of all unique airports from flight data
+        const airports = new Map(); // IATA -> {name, lat, lng}
+        const drIataCodes = this.destinations.map(dest => dest.iata);
+
+        this.flightData.forEach(airportPair => {
+            // Add airport1 if it's not a DR destination
+            if (!drIataCodes.includes(airportPair.airport1_iata)) {
+                const coords1 = this.parseCoordinates(airportPair.airport1_coordinates);
+                airports.set(airportPair.airport1_iata, {
+                    iata: airportPair.airport1_iata,
+                    name: `${airportPair.airport1_city_name}, ${airportPair.airport1_country}`,
+                    lat: coords1[0],
+                    lng: coords1[1]
                 });
-            });
+            }
+
+            // Add airport2 if it's not a DR destination
+            if (!drIataCodes.includes(airportPair.airport2_iata)) {
+                const coords2 = this.parseCoordinates(airportPair.airport2_coordinates);
+                airports.set(airportPair.airport2_iata, {
+                    iata: airportPair.airport2_iata,
+                    name: `${airportPair.airport2_city_name}, ${airportPair.airport2_country}`,
+                    lat: coords2[0],
+                    lng: coords2[1]
+                });
+            }
         });
 
         // Find closest airport
@@ -283,7 +347,7 @@ class FlightPathVisualizer {
             const distance = this.calculateDistance([userLat, userLng], [airport.lat, airport.lng]);
             if (distance < minDistance) {
                 minDistance = distance;
-                closestAirport = airport.name;
+                closestAirport = airport.iata; // Return IATA code instead of name
             }
         });
 
@@ -358,12 +422,17 @@ class FlightPathVisualizer {
         const originCityOnly = selectedOrigin.split(',')[0].trim(); // Extract city name only
         optionsTitle.innerHTML = `${originCityOnly} ${this.createDurationArrow('varies')} <img src="assets/logo-final-2023-05-20.svg" class="inline-logo" alt="Green Office">`;
 
-        // Clear all destination columns
+        // Clear all destination columns and reset styling
         this.destinations.forEach(dest => {
             const columnId = this.getColumnId(dest.name);
             const column = document.getElementById(columnId);
             if (column) {
                 column.innerHTML = '';
+                // Reset column styling to default (remove selected/unselected classes)
+                const columnContainer = column.closest('.destination-column');
+                if (columnContainer) {
+                    columnContainer.classList.remove('selected', 'unselected');
+                }
             }
         });
 
@@ -386,13 +455,13 @@ class FlightPathVisualizer {
     findRoutesForDestination(originKey, destination) {
         const routes = [];
 
-        // Find the destination data
-        const destData = this.flightData.find(d =>
-            d.destination_city_name === destination.name &&
-            d.destination_country === destination.country
-        );
-
-        if (!destData) return routes;
+        // Create a mock destination data object for compatibility
+        const destData = {
+            destination_city_name: destination.name,
+            destination_country: destination.country,
+            destination_airport_iata: destination.iata,
+            destination_airport_coordinates: destination.coords.join(',')
+        };
 
 
 
@@ -446,6 +515,7 @@ class FlightPathVisualizer {
 
             if (firstLegDetails && secondLegDetails) {
                 const transferCity = transferAirportKey.split(', ')[0]; // Extract city name
+                const transferIata = this.getIataFromAirportKey(transferAirportKey);
                 const totalDuration = firstLegDetails.flight_duration_minutes + secondLegDetails.flight_duration_minutes;
 
                 routes.push({
@@ -453,7 +523,7 @@ class FlightPathVisualizer {
                     duration: totalDuration,
                     segments: [firstLegDetails, secondLegDetails],
                     destination: destData,
-                    via: transferCity,
+                    via: `${transferCity} (${transferIata})`,
                     transferAirport: transferAirportKey
                 });
             }
@@ -476,23 +546,72 @@ class FlightPathVisualizer {
         return sortedRoutes.slice(0, 30);
     }
 
+    // Helper function: Convert IATA code to "City, Country" format
+    iataToDisplayName(iata) {
+        for (const airportPair of this.flightData) {
+            if (airportPair.airport1_iata === iata) {
+                return `${airportPair.airport1_city_name}, ${airportPair.airport1_country}`;
+            }
+            if (airportPair.airport2_iata === iata) {
+                return `${airportPair.airport2_city_name}, ${airportPair.airport2_country}`;
+            }
+        }
+        return iata; // Fallback to IATA if not found
+    }
+
+    // Helper function: Convert "City, Country" format to IATA code
+    displayNameToIata(displayName) {
+        const [city, country] = displayName.split(', ');
+        for (const airportPair of this.flightData) {
+            if (airportPair.airport1_city_name === city && airportPair.airport1_country === country) {
+                return airportPair.airport1_iata;
+            }
+            if (airportPair.airport2_city_name === city && airportPair.airport2_country === country) {
+                return airportPair.airport2_iata;
+            }
+        }
+        return displayName; // Fallback if not found
+    }
+
+    // Helper function: Get IATA code from airport key (handles both IATA and "City, Country" formats)
+    getIataFromAirportKey(airportKey) {
+        // If it's already an IATA code (3 letters), return it
+        if (airportKey.length === 3 && airportKey.match(/^[A-Z]{3}$/)) {
+            return airportKey;
+        }
+        // If it's in "City, Country" format, convert to IATA
+        return this.displayNameToIata(airportKey);
+    }
+
+    // Helper function: Normalize airport key (convert to "City, Country" format for compatibility)
+    normalizeAirportKey(key) {
+        // If it's already in "City, Country" format, return as is
+        if (key.includes(', ')) {
+            return key;
+        }
+        // If it's an IATA code, convert to display name
+        return this.iataToDisplayName(key);
+    }
+
     // Helper function: Get airports that a given airport serves directly (ServicesX1)
     getDirectServicesFromAirport(airportKey) {
         const services = new Set();
+        const normalizedKey = this.normalizeAirportKey(airportKey);
 
-        // Find the airport as a destination in flight data
-        const destRecord = this.flightData.find(d => {
-            const destKey = `${d.destination_city_name}, ${d.destination_country}`;
-            return destKey === airportKey;
+        // In the new one-to-one structure, find all airports connected to this airport
+        this.flightData.forEach(airportPair => {
+            const airport1Key = `${airportPair.airport1_city_name}, ${airportPair.airport1_country}`;
+            const airport2Key = `${airportPair.airport2_city_name}, ${airportPair.airport2_country}`;
+
+            // If airport1 matches our target, add airport2 as a service
+            if (airport1Key === normalizedKey) {
+                services.add(airport2Key);
+            }
+            // If airport2 matches our target, add airport1 as a service
+            else if (airport2Key === normalizedKey) {
+                services.add(airport1Key);
+            }
         });
-
-        if (destRecord) {
-            // Add all airports that serve this destination
-            destRecord.direct_services.forEach(service => {
-                const serviceKey = `${service.origin_city_name}, ${service.origin_country}`;
-                services.add(serviceKey);
-            });
-        }
 
         return services;
     }
@@ -500,17 +619,21 @@ class FlightPathVisualizer {
     // Helper function: Get airports that have the given airport as a service (ServicesX2)
     getAirportsServingOrigin(originKey) {
         const services = new Set();
+        const normalizedKey = this.normalizeAirportKey(originKey);
 
-        // Look through all destinations to find ones that have this origin as a service
-        this.flightData.forEach(destRecord => {
-            const hasService = destRecord.direct_services.some(service => {
-                const serviceKey = `${service.origin_city_name}, ${service.origin_country}`;
-                return serviceKey === originKey;
-            });
+        // In the new one-to-one structure, this is the same as getDirectServicesFromAirport
+        // since the relationship is bidirectional
+        this.flightData.forEach(airportPair => {
+            const airport1Key = `${airportPair.airport1_city_name}, ${airportPair.airport1_country}`;
+            const airport2Key = `${airportPair.airport2_city_name}, ${airportPair.airport2_country}`;
 
-            if (hasService) {
-                const destKey = `${destRecord.destination_city_name}, ${destRecord.destination_country}`;
-                services.add(destKey);
+            // If airport1 matches our target, add airport2 as a service
+            if (airport1Key === normalizedKey) {
+                services.add(airport2Key);
+            }
+            // If airport2 matches our target, add airport1 as a service
+            else if (airport2Key === normalizedKey) {
+                services.add(airport1Key);
             }
         });
 
@@ -538,114 +661,46 @@ class FlightPathVisualizer {
 
     // Helper function: Find direct flight between two airports
     findDirectFlight(originKey, destinationKey) {
-        const [destCity, destCountry] = destinationKey.split(', ');
+        const normalizedOriginKey = this.normalizeAirportKey(originKey);
+        const normalizedDestinationKey = this.normalizeAirportKey(destinationKey);
 
-        // Find destination data
-        const destData = this.flightData.find(d =>
-            d.destination_city_name === destCity &&
-            d.destination_country === destCountry
-        );
+        // Find the airport pair that connects these two airports
+        const airportPair = this.flightData.find(pair => {
+            const airport1Key = `${pair.airport1_city_name}, ${pair.airport1_country}`;
+            const airport2Key = `${pair.airport2_city_name}, ${pair.airport2_country}`;
 
-        if (!destData) return null;
-
-        // Look for direct service from origin to destination
-        const directService = destData.direct_services.find(service => {
-            const serviceOriginKey = `${service.origin_city_name}, ${service.origin_country}`;
-            return serviceOriginKey === originKey;
+            return (airport1Key === normalizedOriginKey && airport2Key === normalizedDestinationKey) ||
+                   (airport1Key === normalizedDestinationKey && airport2Key === normalizedOriginKey);
         });
 
-        return directService || null;
+        if (!airportPair) return null;
+
+        // Create a flight service object compatible with the existing structure
+        const airport1Key = `${airportPair.airport1_city_name}, ${airportPair.airport1_country}`;
+
+        // Determine which airport is the origin and which is the destination
+        const isForward = airport1Key === normalizedOriginKey;
+
+        return {
+            origin_city_name: isForward ? airportPair.airport1_city_name : airportPair.airport2_city_name,
+            origin_country: isForward ? airportPair.airport1_country : airportPair.airport2_country,
+            origin_airport_iata: isForward ? airportPair.airport1_iata : airportPair.airport2_iata,
+            origin_airport_coordinates: isForward ? airportPair.airport1_coordinates : airportPair.airport2_coordinates,
+            flight_duration_minutes: airportPair.flight_duration_minutes,
+            airlines: airportPair.airlines
+        };
     }
 
     // Helper function: Get flight details for a specific route leg
     getFlightDetails(originKey, destinationKey) {
-        // First try to find direct flight from origin to destination
-        const directFlight = this.findDirectFlight(originKey, destinationKey);
-        if (directFlight) {
-            return directFlight;
-        }
-
-        // If not found, try reverse lookup (destination to origin, then reverse the data)
-        const reverseFlight = this.findDirectFlight(destinationKey, originKey);
-        if (reverseFlight) {
-            // Create a reversed flight record to match the requested direction
-            const [originCity, originCountry] = originKey.split(', ');
-
-            // Find the destination record to get proper airport coordinates
-            const originDestRecord = this.flightData.find(d =>
-                d.destination_city_name === originCity && d.destination_country === originCountry
-            );
-
-            return {
-                ...reverseFlight,
-                origin_city_name: originCity,
-                origin_country: originCountry,
-                origin_airport_iata: originDestRecord ? originDestRecord.destination_airport_iata : reverseFlight.origin_airport_iata,
-                origin_airport_coordinates: originDestRecord ? originDestRecord.destination_airport_coordinates : reverseFlight.origin_airport_coordinates
-            };
-        }
-
-        return null;
+        // The findDirectFlight method now handles bidirectional lookup automatically
+        return this.findDirectFlight(originKey, destinationKey);
     }
 
     findBidirectionalFlight(originKey, destinationKey) {
-        // Parse destination key to get city and country
-        const [destCity, destCountry] = destinationKey.split(', ');
-
-        // Find destination data
-        const destData = this.flightData.find(d =>
-            d.destination_city_name === destCity &&
-            d.destination_country === destCountry
-        );
-
-        if (!destData) return null;
-
-        // Look for flight in destination's record (origin -> destination)
-        const forwardFlight = destData.direct_services.find(service => {
-            const serviceOriginKey = `${service.origin_city_name}, ${service.origin_country}`;
-            return serviceOriginKey === originKey;
-        });
-
-        // Parse origin key to get city and country
-        const [originCity, originCountry] = originKey.split(', ');
-
-        // Find origin data
-        const originData = this.flightData.find(d =>
-            d.destination_city_name === originCity &&
-            d.destination_country === originCountry
-        );
-
-        // Look for flight in origin's record (destination -> origin, then reverse)
-        let reverseFlight = null;
-        if (originData) {
-            reverseFlight = originData.direct_services.find(service => {
-                const serviceOriginKey = `${service.origin_city_name}, ${service.origin_country}`;
-                return serviceOriginKey === destinationKey;
-            });
-        }
-
-        // Combine and return the more conservative option
-        if (forwardFlight && reverseFlight) {
-            // Take the more conservative flight (longer duration, fewer days per week)
-            return {
-                ...forwardFlight,
-                flight_duration_minutes: Math.max(forwardFlight.flight_duration_minutes, reverseFlight.flight_duration_minutes),
-                airlines: this.combineAirlineData([forwardFlight], [reverseFlight])
-            };
-        }
-
-        // If we only have a reverse flight, we need to swap origin/destination to match the requested direction
-        if (reverseFlight && !forwardFlight) {
-            return {
-                ...reverseFlight,
-                origin_city_name: originCity,
-                origin_country: originCountry,
-                origin_airport_iata: originData ? originData.destination_airport_iata : reverseFlight.origin_airport_iata,
-                origin_airport_coordinates: originData ? originData.destination_airport_coordinates : reverseFlight.origin_airport_coordinates
-            };
-        }
-
-        return forwardFlight;
+        // In the new one-to-one structure, this is the same as findDirectFlight
+        // since bidirectional logic is already handled there
+        return this.findDirectFlight(originKey, destinationKey);
     }
 
     combineAirlineData(airlines1, airlines2) {
@@ -784,7 +839,8 @@ class FlightPathVisualizer {
 
         routes.forEach((route) => {
             const button = document.createElement('button');
-            button.className = 'flight-option-btn';
+            // Add transfer class for connecting flights
+            button.className = route.type === 'connecting' ? 'flight-option-btn transfer' : 'flight-option-btn';
 
             // Calculate volume for this route
             const volume = this.calculateRouteVolume(route);
@@ -843,13 +899,16 @@ class FlightPathVisualizer {
             buttonElement.classList.add('selected');
         }
 
+        // Update destination column styling
+        this.updateDestinationColumnStyling(route.destination.destination_city_name);
+
         // Update flight options header with selected route details
         this.updateFlightOptionsHeader(route);
 
         // Add fade effect to maps
         this.addMapFadeEffect();
 
-        // Draw the route on map
+        // Draw the route on map (always show the whole route, no additional zoom)
         this.drawFlightPath(route);
 
         // Switch destination image
@@ -857,6 +916,29 @@ class FlightPathVisualizer {
 
         // Show flight details
         this.displayFlightDetails(route);
+    }
+
+    updateDestinationColumnStyling(selectedDestinationName) {
+        // Get all destination column containers (the parent divs with class 'destination-column')
+        const destinationColumns = document.querySelectorAll('.destination-column');
+
+        destinationColumns.forEach(column => {
+            // Get the header text to identify which destination this column represents
+            const header = column.querySelector('.destination-header');
+            if (header) {
+                const columnDestinationName = header.textContent.trim();
+
+                // Remove existing styling classes
+                column.classList.remove('selected', 'unselected');
+
+                // Apply appropriate styling based on selection
+                if (columnDestinationName === selectedDestinationName) {
+                    column.classList.add('selected');
+                } else {
+                    column.classList.add('unselected');
+                }
+            }
+        });
     }
 
     updateFlightOptionsHeader(route) {
@@ -1146,28 +1228,36 @@ class FlightPathVisualizer {
     optimizeWorldMapZoom() {
         if (this.currentMarkers.length === 0) return;
 
-        const group = new L.featureGroup(this.currentMarkers);
-        const bounds = group.getBounds();
-
-        // Calculate optimal padding based on route distance
-        const distance = this.calculateBoundsDistance(bounds);
-        let padding = 0.15; // Default padding
-
-        // Adjust padding based on distance
-        if (distance < 1000) { // Short routes (< 1000km)
-            padding = 0.25;
-        } else if (distance < 5000) { // Medium routes (1000-5000km)
-            padding = 0.2;
-        } else { // Long routes (> 5000km)
-            padding = 0.1;
+        // Cancel any pending zoom operation
+        if (this.zoomTimeout) {
+            clearTimeout(this.zoomTimeout);
         }
 
-        // Fit bounds with calculated padding
-        this.worldMap.fitBounds(bounds.pad(padding), {
-            maxZoom: 8, // Prevent over-zooming
-            animate: true,
-            duration: 1.0
-        });
+        // Delay the zoom operation slightly to ensure map state is stable
+        this.zoomTimeout = setTimeout(() => {
+            const group = new L.featureGroup(this.currentMarkers);
+            const bounds = group.getBounds();
+
+            // Calculate optimal padding based on route distance
+            const distance = this.calculateBoundsDistance(bounds);
+            let padding = 0.15; // Default padding
+
+            // Adjust padding based on distance
+            if (distance < 1000) { // Short routes (< 1000km)
+                padding = 0.25;
+            } else if (distance < 5000) { // Medium routes (1000-5000km)
+                padding = 0.2;
+            } else { // Long routes (> 5000km)
+                padding = 0.1;
+            }
+
+            // Fit bounds with calculated padding - single call only
+            this.worldMap.fitBounds(bounds.pad(padding), {
+                maxZoom: 8, // Prevent over-zooming
+                animate: true,
+                duration: 1.0
+            });
+        }, 50); // Small delay to ensure stability
     }
 
     calculateBoundsDistance(bounds) {
@@ -1177,11 +1267,12 @@ class FlightPathVisualizer {
     }
 
     drawDirectPath(start, end) {
-        // Draw straight lines with black color
+        // Draw straight lines with black color (thin and dotted)
         const path = L.polyline([start, end], {
             color: '#000000',  // Black color
-            weight: 3,
-            opacity: 0.7
+            weight: 1, // Thin line
+            opacity: 0.5, // More subtle
+            dashArray: '3, 6' // Dotted pattern: 3px dash, 6px gap
         }).addTo(this.worldMap);
 
         if (!this.currentPath) {
@@ -1392,8 +1483,7 @@ class FlightPathVisualizer {
         // Hide flight details
         this.hideFlightDetails();
 
-        // Reset world map view to Caribbean area
-        this.worldMap.setView([19.0, -70.0], 3);
+        // Don't reset map view here - let optimizeWorldMapZoom handle it
     }
 
     hideLoading() {

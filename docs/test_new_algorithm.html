@@ -80,7 +80,7 @@
             
             try {
                 // Create a minimal version of the FlightPathVisualizer for testing
-                const response = await fetch('flights.jsonl');
+                const response = await fetch('flightsOnetoOne.jsonl');
                 const text = await response.text();
                 const lines = text.trim().split('\n');
                 const flightData = lines.map(line => JSON.parse(line));

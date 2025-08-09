@@ -33,7 +33,7 @@ body {
     font-size: 2.5rem;
     font-weight: 700;
     margin-bottom: 10px;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    text-shadow: 0 2px 4px var(--black-shadow);
     animation: fadeInDown 1s ease-out;
     display: flex;
     align-items: center;
@@ -49,11 +49,11 @@ body {
 }
 
 .header-origin-select {
-    font-size: 1.2rem; /* Match the 'Getting' text size */
+    font-size: 1.44rem; /* Increased by 20% from 1.2rem */
     font-weight: 600; /* Match the 'Getting' text weight */
-    color: #000000;
-    background: rgba(255,255,255,0.95);
-    border: 2px solid black; /* Changed to black border */
+    color: var(--blue-main); /* Changed to use origin blue color */
+    background: var(--white-main);
+    border: 2px solid var(--blue-main); /* Changed to blue border to match origin city border */
     border-radius: 12px;
     padding: 8px 16px;
     margin-left: 10px;
@@ -67,12 +67,12 @@ body {
 
 .header-origin-select:focus {
     outline: none;
-    border-color: black;
-    box-shadow: 0 0 0 3px rgba(0,0,0,0.1);
+    border-color: var(--blue-main);
+    box-shadow: 0 0 0 3px var(--blue-light-opacity);
 }
 
 .header-origin-select option {
-    color: #333;
+    color: var(--blue-main); /* Changed to blue to match origin city border */
     background: white;
     font-size: 1rem;
     font-weight: 400;
@@ -171,10 +171,53 @@ body {
 
 /* Color Variables */
 :root {
-    --primary-green: rgb(16, 154, 72);
-    --primary-green-light: rgba(16, 154, 72, 0.1);
-    --primary-green-medium: rgba(16, 154, 72, 0.3);
-    --primary-green-dark: rgba(16, 154, 72, 0.9);
+    /* ========================================
+       MASTER COLOR CONTROL SYSTEM
+       ========================================
+       All app colors are controlled from here.
+       Each color has 3 versions for consistency:
+       - main: Dark version for text, borders, icons
+       - light-opacity: Semi-transparent for map marker backgrounds
+       - light-solid: Opaque light version for blocking backgrounds
+    */
+
+    /* DESTINATION COLORS (Green)
+       Used for: Dominican Republic destinations, direct flight buttons,
+       destination markers, volume bars in selected destination columns */
+    --green-main: rgb(16, 154, 72);                    /* Text, borders, icons */
+    --green-light-opacity: rgba(16, 154, 72, 0);     /* Map marker backgrounds */
+    --green-light-solid: rgb(220, 255, 243);       /* Blocking backgrounds */
+
+    /* ORIGIN COLORS (Blue)
+       Used for: Origin city text, origin markers, origin dropdown styling,
+       selected origin city in header */
+    --blue-main: rgb(38, 0, 255);                      /* Text, borders, icons */
+    --blue-light-opacity: rgba(38, 0, 255, 0);       /* Map marker backgrounds */
+    --blue-light-solid: rgba(230, 230, 255, 1);        /* Blocking backgrounds */
+
+    /* TRANSFER COLORS (Brown)
+       Used for: Transfer city buttons, transfer markers, volume bars
+       in transfer flight options (only in selected columns) */
+    --brown-main: rgb(146, 64, 14);                    /* Text, borders, icons */
+    --brown-light-opacity: rgba(146, 64, 14, 0);     /* Map marker backgrounds */
+    --brown-light-solid: rgba(251, 230, 200, 1);       /* Blocking backgrounds */
+
+    /* NEUTRAL COLORS (Grey)
+       Used for: Unselected columns, disabled states, secondary text,
+       volume bars in unselected columns */
+    --grey-main: rgb(102, 102, 102);                   /* Text, borders, icons */
+    --grey-light-opacity: rgba(102, 102, 102, 0.3);    /* Map marker backgrounds */
+    --grey-light-solid: rgba(245, 245, 245, 1);        /* Blocking backgrounds */
+    --grey-border: #ccc;                               /* Light borders */
+    --grey-medium: #999;                               /* Medium grey text */
+
+    /* BACKGROUND & UI COLORS
+       Used for: Main backgrounds, shadows, borders, ocean color */
+    --white-main: rgba(255, 255, 255, 0.95);           /* Main panel backgrounds */
+    --white-border: rgba(255, 255, 255, 0.3);          /* Panel borders */
+    --black-shadow: rgba(0, 0, 0, 0.3);                /* Drop shadows */
+    --black-shadow-light: rgba(0, 0, 0, 0.1);          /* Light shadows */
+    --ocean-blue: rgb(137, 216, 236);                  /* World map ocean color */
 }
 
 /* Maps Container */
@@ -187,26 +230,26 @@ body {
 }
 
 .map-section {
-    background: rgba(255,255,255,0.95);
+    background: var(--white-main);
     border-radius: 16px;
     padding: 15px;
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.3);
+    border: 1px solid var(--white-border);
 }
 
 .map-container, .image-container {
     position: relative;
     overflow: hidden;
     border-radius: 12px;
-    box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.1);
-    border: 4px solid black;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.15), 0 4px 16px var(--black-shadow-light);
+    border: 2px solid var(--dark-green); /* Changed to dark green and half thickness */
     padding: 0;
     flex: 1;
     height: 380px; /* Fixed height for perfect alignment */
 }
 
 .map-container {
-    background: rgb(137, 216, 236); /* Ocean color for world map */
+    background: var(--ocean-blue); /* Ocean color for world map */
 }
 
 .map-container::after {
@@ -293,12 +336,12 @@ body {
 
 /* Flight Options */
 .flight-options {
-    background: rgba(255,255,255,0.95);
+    background: var(--white-main);
     border-radius: 16px;
     padding: 18px; /* Reduced from 25px */
     margin-top: 15px; /* Reduced from 20px */
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.3);
+    border: 1px solid var(--white-border);
     animation: slideInUp 0.5s ease-out;
 }
 
@@ -317,14 +360,91 @@ body {
 }
 
 .destination-column {
-    background: rgba(34,197,94,0.1);
+    background: var(--green-light-solid);
     border-radius: 12px;
     padding: 15px;
-    border: 2px solid rgba(34,197,94,0.2);
+    border: 2px solid var(--green-light-opacity);
     height: 250px; /* Reduced from ~500px to 250px (50% reduction) */
     overflow-y: auto; /* Add vertical scroll */
     display: flex;
     flex-direction: column;
+    transition: all 0.3s ease; /* Smooth transition for background changes */
+}
+
+/* Selected destination column styling */
+.destination-column.selected {
+    background: var(--green-light-solid);
+    border: 2px solid var(--green-main); /* Green border for selected column */
+}
+
+/* Unselected destination column styling */
+.destination-column.unselected {
+    background: white;
+    border: 2px solid #ccc;
+}
+
+.destination-column.unselected .destination-header {
+    color: #666;
+    border-bottom: 2px solid #ccc; /* Grey underline for unselected */
+}
+
+.destination-column.unselected .flight-option-btn {
+    background: white;
+    border: 2px solid #ccc;
+    color: #666;
+}
+
+.destination-column.unselected .flight-option-btn:hover {
+    background: #f5f5f5;
+    color: #333;
+    border-color: #999;
+}
+
+.destination-column.unselected .flight-option-btn.selected {
+    background: #ccc;
+    color: white;
+    border-color: #ccc;
+}
+
+/* Unselected destination transfer button styling - override transfer colors with grey */
+.destination-column.unselected .flight-option-btn.transfer {
+    background: white;
+    border: 2px solid var(--grey-border);
+    color: var(--grey-main);
+}
+
+.destination-column.unselected .flight-option-btn.transfer:hover {
+    background: var(--grey-light-solid);
+    color: var(--grey-main);
+    border-color: var(--grey-medium);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.destination-column.unselected .flight-option-btn.transfer.selected {
+    background: var(--grey-border);
+    color: white;
+    border-color: var(--grey-border);
+}
+
+/* Unselected destination transfer volume styling - override brown with grey */
+.destination-column.unselected .flight-option-btn.transfer .volume-indicator {
+    background: white; /* Always white background */
+    border-color: var(--grey-border); /* Grey border */
+}
+
+.destination-column.unselected .flight-option-btn.transfer .volume-fill {
+    background: var(--grey-border); /* Light grey fill */
+}
+
+/* Volume bar styling for unselected destinations */
+.destination-column.unselected .volume-indicator {
+    background: white; /* Always white background */
+    border-color: var(--grey-border); /* Grey border */
+}
+
+.destination-column.unselected .volume-fill {
+    background: var(--grey-border); /* Light grey fill */
 }
 
 .destination-column::-webkit-scrollbar {
@@ -332,12 +452,12 @@ body {
 }
 
 .destination-column::-webkit-scrollbar-track {
-    background: rgba(34,197,94,0.1);
+    background: var(--green-light-solid);
     border-radius: 4px;
 }
 
 .destination-column::-webkit-scrollbar-thumb {
-    background: rgba(16,154,72,0.4);
+    background: var(--green-main);
     border-radius: 4px;
 }
 
@@ -345,13 +465,27 @@ body {
     background: rgba(16,154,72,0.6);
 }
 
+.destination-column.unselected::-webkit-scrollbar-track {
+    background: #f5f5f5;
+    border-radius: 4px;
+}
+
+.destination-column.unselected::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 4px;
+}
+
+.destination-column.unselected::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
 .destination-header {
-    color: var(--primary-green);
+    color: var(--green-main);
     font-size: 1.1rem;
     font-weight: 600;
     margin-bottom: 15px;
     text-align: center;
-    border-bottom: 2px solid var(--primary-green-medium);
+    border-bottom: 2px solid var(--green-main); /* Changed to dark green for selected */
     padding-bottom: 8px;
     flex-shrink: 0; /* Prevent header from shrinking */
 }
@@ -373,32 +507,61 @@ body {
 
 .flight-option-btn {
     background: white;
-    border: 2px solid var(--primary-green);
+    border: 2px solid var(--green-main);
     border-radius: 8px;
     padding: 10px 12px;
     font-size: 0.9rem;
     font-weight: 500;
-    color: var(--primary-green);
+    color: var(--green-main);
     cursor: pointer;
     transition: all 0.3s ease;
     text-align: center;
 }
 
 .flight-option-btn:hover {
-    background: var(--primary-green);
+    background: var(--green-main);
     color: white;
     transform: translateY(-1px);
-    box-shadow: 0 2px 8px var(--primary-green-medium);
+    box-shadow: 0 2px 8px var(--green-light-opacity);
 }
 
 .flight-option-btn.selected {
-    background: var(--primary-green);
+    background: var(--green-main);
     color: white;
-    border-color: var(--primary-green);
+    border-color: var(--green-main);
 }
 
-.flight-option-btn.selected .volume-fill {
+/* Selected button volume styling - maintain percentage fill visibility */
+/* Removed .flight-option-btn.selected .volume-fill override to preserve volume indicators */
+
+/* Transfer City Button Styling */
+.flight-option-btn.transfer {
     background: white;
+    border: 2px solid var(--brown-main);
+    color: var(--brown-main);
+}
+
+.flight-option-btn.transfer:hover {
+    background: var(--brown-main);
+    color: white;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px var(--brown-light-opacity);
+}
+
+.flight-option-btn.transfer.selected {
+    background: var(--brown-main);
+    color: white;
+    border-color: var(--brown-main);
+}
+
+/* Transfer city volume indicator styling - uniform design */
+.flight-option-btn.transfer .volume-indicator {
+    background: white; /* Always white background */
+    border-color: var(--brown-main); /* Brown border */
+}
+
+.flight-option-btn.transfer .volume-fill {
+    background: var(--brown-light-solid); /* Light brown fill */
 }
 
 .button-content {
@@ -438,29 +601,25 @@ body {
 .volume-indicator {
     width: 100%;
     height: 8px;
-    background: var(--primary-green-light);
+    background: white; /* Always white background */
     border-radius: 4px;
     overflow: hidden;
-    border: 1px solid var(--primary-green-medium);
+    border: 1px solid var(--green-main); /* Green border for direct flights */
     position: relative;
     transition: all 0.3s ease;
 }
 
 .volume-fill {
     height: 100%;
-    background: linear-gradient(90deg, var(--primary-green), rgba(16, 154, 72, 0.7));
+    background: var(--green-light-solid); /* Light green fill for direct flights */
     transition: width 0.3s ease;
 }
 
-/* Volume indicator hover effect */
+/* Volume indicator hover effect - uniform across all button types */
 .flight-option-btn:hover .volume-indicator {
-    background: white;
-    border-color: #ccc;
+    background: white; /* Keep white background */
+    border-color: var(--grey-border); /* Grey border on hover */
     height: 16px; /* Increase height to accommodate text */
-}
-
-.flight-option-btn:hover .volume-fill {
-    background: white;
 }
 
 .flight-option-btn:hover .volume-indicator::after {
@@ -471,8 +630,9 @@ body {
     transform: translate(-50%, -50%);
     font-size: 0.7rem;
     font-weight: 600;
-    color: black;
+    color: black; /* Black font as specified */
     white-space: nowrap;
+    z-index: 1;
 }
 
 .flight-option-btn .duration {
@@ -482,18 +642,18 @@ body {
 
 /* Flight Details */
 .flight-details {
-    background: rgba(255,255,255,0.95);
+    background: var(--white-main);
     border-radius: 16px;
     padding: 25px;
     margin-top: 20px;
     backdrop-filter: blur(10px);
-    border: 1px solid rgba(255,255,255,0.3);
+    border: 1px solid var(--white-border);
     animation: slideInUp 0.5s ease-out;
-    border-top: 3px solid rgba(16, 154, 72, 0.4); /* Light green separator line */
+    /* Removed the separator line */
 }
 
 .details-title {
-    color: var(--primary-green);
+    color: var(--green-main);
     font-size: 1.5rem;
     font-weight: 700;
     margin-bottom: 20px;
@@ -507,19 +667,19 @@ body {
 }
 
 .segment-column {
-    background: var(--primary-green-light);
+    background: var(--green-light-solid);
     border-radius: 12px;
     padding: 15px;
-    border: 1px solid var(--primary-green-medium);
+    border: 2px solid var(--green-main); /* Match selected destination border thickness and color */
 }
 
 .segment-header {
-    color: var(--primary-green);
+    color: var(--green-main);
     font-size: 1.1rem;
     font-weight: 600;
     margin-bottom: 15px;
     text-align: center;
-    border-bottom: 2px solid var(--primary-green-medium);
+    border-bottom: 2px solid var(--green-main); /* Match selected destination underline */
     padding-bottom: 8px;
     display: flex;
     align-items: center;
@@ -594,7 +754,7 @@ body {
     flex: 1;
     text-align: right;
     font-weight: 500;
-    color: var(--primary-green);
+    color: var(--green-main);
 }
 
 .calendar-icon {
@@ -684,7 +844,7 @@ body {
     }
 
     .header-origin-select {
-        font-size: 1.5rem;
+        font-size: 1.8rem; /* Increased by 20% from 1.5rem */
         margin: 10px 0 0 0;
         min-width: 300px; /* Increased for mobile */
         max-width: 400px; /* Increased for mobile */
@@ -857,28 +1017,25 @@ body {
 }
 
 .custom-marker.origin .marker-label {
-    background: rgba(230, 230, 255, 0.9); /* Blue background for origin text */
-    color: rgb(38, 0, 255);
-    border: 3px solid rgb(38, 0, 255);; /* Blue border */
-    border-radius: 12px;
+    background: var(--blue-light-opacity); /* Blue background for origin text */
+    color: var(--blue-main);
+    border-radius: 6px;
     padding: 4px 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .custom-marker.destination .marker-label {
-    background: rgba(255, 255, 255, 0.9); /* Green background for destination text */
-    color: rgba(16, 154, 72, 0.9);
-    border: 3px solid rgba(16, 154, 72, 0.9); /* Green border */
-    border-radius: 12px;
+    background: var(--green-light-opacity); /* Green background for destination text */
+    color: var(--green-main);
+    border-radius: 6px;
     padding: 4px 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
 
 .custom-marker.transfer .marker-label {
-    background: rgba(251, 191, 36, 0.9); /* Yellow background for transfer text */
-    color: #92400e;
-    border: 3px solid #92400e; /* Black border */
-    border-radius: 12px;
+    background: var(--brown-light-opacity); /* Brown background for transfer text */
+    color: var(--brown-main);
+    border-radius: 6px;
     padding: 4px 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.3);
 }
@@ -904,15 +1061,15 @@ body {
 }
 
 .city-dot.origin {
-    background-color: rgb(38, 0, 255); /* Same blue as origin city label */
+    background-color: var(--blue-main); /* Same blue as origin city label */
 }
 
 .city-dot.destination {
-    background-color: rgba(16, 154, 72, 0.9); /* Same green as destination border */
+    background-color: var(--green-main); /* Same green as destination border */
 }
 
 .city-dot.transfer {
-    background-color: #92400e; /* Same dark yellow/brown as transfer city label */
+    background-color: var(--brown-main); /* Same brown as transfer city label */
 }
 
 /* Custom Map Styles */
